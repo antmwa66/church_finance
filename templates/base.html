@@ -8,6 +8,8 @@
 </head>
 <body>
     {% if session.get('user_id') %}
+    <button class="sidebar-toggle" type="button" aria-label="Toggle menu" onclick="toggleSidebar()">&#9776;</button>
+    <div class="sidebar-overlay" onclick="toggleSidebar()"></div>
     <aside class="sidebar">
         <div class="sidebar-brand">
             <a href="{{ url_for('dashboard') }}">Church Finance</a>
@@ -44,5 +46,29 @@
         {% endwith %}
         {% block content %}{% endblock %}
     </main>
+    <script>
+        function toggleSidebar() {
+            document.body.classList.toggle('sidebar-open');
+            var sb = document.querySelector('.sidebar');
+            if (sb) sb.classList.toggle('open');
+        }
+        function closeSidebar() {
+            document.body.classList.remove('sidebar-open');
+            var sb = document.querySelector('.sidebar');
+            if (sb) sb.classList.remove('open');
+        }
+        // Auto-close the sidebar after tapping a link inside it (mobile).
+        document.addEventListener('DOMContentLoaded', function () {
+            var sidebar = document.querySelector('.sidebar');
+            if (sidebar) {
+                sidebar.addEventListener('click', function (e) {
+                    var link = e.target.closest('a');
+                    if (link && window.matchMedia('(max-width: 768px)').matches) {
+                        closeSidebar();
+                    }
+                });
+            }
+        });
+    </script>
 </body>
 </html>

@@ -730,16 +730,87 @@ tr:last-child td {
     font-size: 0.8rem;
 }
 
+/* Mobile menu toggle + overlay (hidden on desktop) */
+.sidebar-toggle {
+    display: none;
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    z-index: 1100;
+    width: 44px;
+    height: 44px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface);
+    color: var(--text);
+    font-size: 22px;
+    line-height: 1;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.sidebar-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 999;
+}
+
+body.sidebar-open .sidebar-overlay {
+    display: block;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
+    .sidebar-toggle {
+        display: block;
+    }
     .sidebar {
         transform: translateX(-100%);
+        transition: transform 0.25s ease;
+        z-index: 1000;
+        box-shadow: 2px 0 16px rgba(0, 0, 0, 0.15);
+    }
+    .sidebar.open {
+        transform: translateX(0);
     }
     .main-content {
         margin-left: 0;
-        padding: 20px;
+        padding: 72px 16px 24px;
     }
     .stats-grid {
         grid-template-columns: 1fr;
+    }
+    .amount-grid {
+        grid-template-columns: 1fr;
+    }
+    /* Prevent iOS zoom-on-focus and improve tap targets */
+    input, select, textarea {
+        font-size: 16px;
+    }
+    .btn {
+        min-height: 44px;
+    }
+    .form-card .btn {
+        width: 100%;
+        margin-top: 4px;
+    }
+    h2 {
+        font-size: 1.4rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .table-container {
+        margin: 0 -16px;
+        border-radius: 0;
+        border-left: none;
+        border-right: none;
+    }
+    th, td {
+        padding: 12px 14px;
+        font-size: 0.82rem;
+        white-space: nowrap;
     }
 }
