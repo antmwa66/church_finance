@@ -19,7 +19,17 @@
                 <span class="nav-icon">📊</span>
                 <span class="nav-label">Dashboard</span>
             </a>
-            {% block sidebar %}{% endblock %}
+            {% block sidebar %}
+                {% if session.get('role') == 'admin' %}
+                    {% include 'admin/sidebar.html' %}
+                {% elif session.get('role') == 'regional_bishop' %}
+                    {% include 'regional/sidebar.html' %}
+                {% elif session.get('role') == 'sub_region_bishop' %}
+                    {% include 'subregion/sidebar.html' %}
+                {% elif session.get('role') == 'local_pastor' %}
+                    {% include 'pastor/sidebar.html' %}
+                {% endif %}
+            {% endblock %}
         </nav>
         <div class="sidebar-footer">
             <div class="user-info">
