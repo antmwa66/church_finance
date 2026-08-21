@@ -1,0 +1,1 @@
+web: python render-build.sh && gunicorn app:app --bind 0.0.0.0:$PORT
