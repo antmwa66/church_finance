@@ -597,6 +597,10 @@ def admin_create_region():
         if not name:
             flash('Region name is required.', 'danger')
             return redirect(url_for('admin_create_region'))
+        existing = Region.query.filter(db.func.lower(Region.name) == name.lower()).first()
+        if existing:
+            flash('A region with this name already exists.', 'danger')
+            return redirect(url_for('admin_create_region'))
         region = Region(name=name, admin_id=session['user_id'])
         db.session.add(region)
         db.session.commit()
@@ -695,6 +699,47 @@ def admin_manage_pastors():
 def admin_manage_regions():
     regions = Region.query.order_by(Region.created_at.desc()).all()
     return render_template('admin/manage_regions.html', regions=regions)
+
+
+@app.route('/admin/edit_region/<int:region_id>', methods=['GET', 'POST'])
+@login_required
+@role_required('admin')
+def admin_edit_region(region_id):
+    region = Region.query.get_or_404(region_id)
+    if request.method == 'POST':
+        name = request.form.get('name', '').strip()
+        if not name:
+            flash('Region name is required.', 'danger')
+            return render_template('admin/edit_region.html', region=region)
+        duplicate = Region.query.filter(
+            Region.id != region.id, db.func.lower(Region.name) == name.lower()).first()
+        if duplicate:
+            flash('A region with this name already exists.', 'danger')
+            return render_template('admin/edit_region.html', region=region)
+        region.name = name
+        db.session.commit()
+        flash('Region "{}" updated successfully.'.format(name), 'success')
+        return redirect(url_for('admin_manage_regions'))
+    return render_template('admin/edit_region.html', region=region)
+
+
+@app.route('/admin/delete_region/<int:region_id>', methods=['POST'])
+@login_required
+@role_required('admin')
+def admin_delete_region(region_id):
+    region = Region.query.get_or_404(region_id)
+    bishop = User.query.filter(
+        User.region_id == region.id,
+        User.role.in_(['regional_bishop', 'sub_region_bishop'])
+    ).first()
+    if bishop:
+        flash('Cannot delete region "{}" because bishop {} is assigned to it.'.format(
+            region.name, bishop.full_name), 'danger')
+        return redirect(url_for('admin_manage_regions'))
+    db.session.delete(region)
+    db.session.commit()
+    flash('Region "{}" deleted successfully.'.format(region.name), 'success')
+    return redirect(url_for('admin_manage_regions'))
 
 
 @app.route('/admin/payments')
