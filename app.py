@@ -216,6 +216,51 @@ def link_payment_to_allocation(payment, church_id, category_id, amount):
     return chosen
 
 
+# Initialize database on startup
+def initialize_database():
+    with app.app_context():
+        try:
+            db.create_all()
+            print("Database tables created/verified")
+            
+            # Create admin user if it doesn't exist
+            admin = User.query.filter_by(username='admin').first()
+            if not admin:
+                admin = User(
+                    username='admin',
+                    password_hash=generate_password_hash('admin123'),
+                    role='admin',
+                    full_name='System Administrator',
+                    email='admin@church.org',
+                    phone='0000000000'
+                )
+                db.session.add(admin)
+                db.session.commit()
+                print('Default admin created: username=admin, password=admin123')
+            else:
+                # Reset password to ensure it's correct
+                admin.password_hash = generate_password_hash('admin123')
+                db.session.commit()
+                print('Admin password reset to: admin123')
+            
+            # Create payment categories
+            categories = ['Tithe', 'Mission', 'Bills', 'Church Construction', 'Offering', 'Donation']
+            for cat_name in categories:
+                existing = PaymentCategory.query.filter_by(name=cat_name).first()
+                if not existing:
+                    category = PaymentCategory(name=cat_name, description=cat_name + ' payments')
+                    db.session.add(category)
+            db.session.commit()
+            print('Payment categories initialized')
+            
+        except Exception as e:
+            print(f"Database initialization error: {e}")
+            db.session.rollback()
+
+# Run initialization
+initialize_database()
+
+
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
