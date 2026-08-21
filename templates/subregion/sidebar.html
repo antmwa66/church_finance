@@ -1,0 +1,32 @@
+{% block sidebar %}
+<div class="menu-section-header">Management</div>
+<a href="{{ url_for('subregion_create_church') }}" class="nav-item {% if request.endpoint == 'subregion_create_church' %}active{% endif %}">
+    <span class="nav-icon">⛪</span>
+    <span class="nav-label">Create Church</span>
+</a>
+<a href="{{ url_for('subregion_create_pastor') }}" class="nav-item {% if request.endpoint == 'subregion_create_pastor' %}active{% endif %}">
+    <span class="nav-icon">👤</span>
+    <span class="nav-label">Create Local Pastor</span>
+</a>
+<a href="{{ url_for('subregion_manage_pastors') }}" class="nav-item {% if request.endpoint in ['subregion_manage_pastors','subregion_transfer_pastor'] %}active{% endif %}">
+    <span class="nav-icon">👥</span>
+    <span class="nav-label">Manage Local Pastors</span>
+</a>
+<div class="menu-section-header">Finance</div>
+<a href="{{ url_for('subregion_allocations') }}" class="nav-item {% if request.endpoint in ['subregion_allocations','subregion_cascade_allocation'] %}active{% endif %}">
+    <span class="nav-icon">🧮</span>
+    <span class="nav-label">Fund Allocations</span>
+</a>
+<a href="{{ url_for('subregion_make_payment') }}" class="nav-item {% if request.endpoint == 'subregion_make_payment' %}active{% endif %}">
+    <span class="nav-icon">💳</span>
+    <span class="nav-label">Make Payment</span>
+</a>
+<a href="{{ url_for('subregion_payments') }}" class="nav-item {% if request.endpoint == 'subregion_payments' %}active{% endif %}">
+    <span class="nav-icon">📋</span>
+    <span class="nav-label">View Payments</span>
+</a>
+<a href="{{ url_for('subregion_payments_by_category') }}" class="nav-item {% if request.endpoint in ['subregion_payments_by_category','subregion_payments_by_category_detail'] %}active{% endif %}">
+    <span class="nav-icon">📊</span>
+    <span class="nav-label">Payments by Category</span>
+</a>
+{% endblock %}

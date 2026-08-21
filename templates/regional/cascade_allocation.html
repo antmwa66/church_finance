@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Cascade Allocation - Church Finance{% endblock %}
+{% block content %}
+<h2>Cascade Allocation to Sub-Regions</h2>
+
+<div class="info-card">
+    <p><strong>Category:</strong> {{ allocation.category.name }}</p>
+    <p><strong>Total allocated:</strong> KES {{ '{:,.2f}'.format(allocation.amount) }}</p>
+    <p><strong>Already cascaded:</strong> KES {{ '{:,.2f}'.format(allocation.cascaded_amount()) }}</p>
+    <p><strong>Remaining:</strong> KES {{ '{:,.2f}'.format(remaining) }}</p>
+</div>
+
+<div class="form-card">
+    <h3>Distribute to Sub-Regions</h3>
+    <p class="form-hint">Enter the amount to send to each sub-region. The total cannot exceed the remaining amount.</p>
+    <form method="POST" action="{{ url_for('regional_cascade_allocation', allocation_id=allocation.id) }}">
+        {% for sr in sub_regions %}
+        <div class="form-group">
+            <label for="amount_{{ sr.id }}">{{ sr.name }}</label>
+            <input type="number" step="0.01" min="0" id="amount_{{ sr.id }}" name="amount_{{ sr.id }}" placeholder="0.00">
+        </div>
+        {% endfor %}
+        <button type="submit" class="btn btn-primary">Cascade Allocation</button>
+        <a href="{{ url_for('regional_allocations') }}" class="btn btn-secondary">Back</a>
+    </form>
+</div>
+{% endblock %}

@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}My Allocations - Church Finance{% endblock %}
+{% block content %}
+<h2>Fund Allocations</h2>
+<div class="info-card">
+    <p><strong>Church:</strong> {{ church.name if church else 'Not assigned' }}</p>
+</div>
+
+<h3>Allocations for My Church</h3>
+<div class="table-container">
+    <table>
+        <thead>
+            <tr>
+                <th>Category</th>
+                <th>Allocated (KES)</th>
+                <th>Paid (KES)</th>
+                <th>Balance (KES)</th>
+                <th>Date</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for a in allocations %}
+            <tr>
+                <td>{{ a.category.name }}</td>
+                <td>{{ '{:,.2f}'.format(a.amount) }}</td>
+                <td>{{ '{:,.2f}'.format(a.paid_amount()) }}</td>
+                <td>
+                    {% set bal = a.balance() %}
+                    <span class="{{ 'text-danger' if bal < -0.001 else ('text-success' if bal > 0.001 else '') }}">
+                        {{ '{:,.2f}'.format(bal) }}
+                    </span>
+                </td>
+                <td>{{ a.created_at.strftime('%Y-%m-%d') }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" class="empty-cell">No allocations received for your church yet.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="info-card" style="margin-top:20px;">
+    <p>When you <a href="{{ url_for('pastor_make_payment') }}">make a payment</a> in a category that has an allocation,
+    the amount is automatically deducted and the balance above is updated.</p>
+</div>
+{% endblock %}

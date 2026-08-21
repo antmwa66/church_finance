@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Region Payments - Church Finance{% endblock %}
+{% block content %}
+<h2>Region Payments by Sub-Region</h2>
+<div class="summary-bar highlight">
+    <span>Total Amount: KES {{ "%.2f"|format(total_amount) }}</span>
+</div>
+<div class="table-container">
+    <table>
+        <thead>
+            <tr>
+                <th>Sub-Region</th>
+                <th>Payments Count</th>
+                <th>Total Amount (KES)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for name, count, total in sub_totals %}
+            <tr>
+                <td>{{ name }}</td>
+                <td>{{ count }}</td>
+                <td class="amount">KES {{ "%.2f"|format(total or 0) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+<a href="{{ url_for('regional_payments_by_category') }}" class="btn btn-primary">View by Category</a>
+<a href="{{ url_for('regional_dashboard') }}" class="btn btn-secondary">Back to Dashboard</a>
+{% endblock %}

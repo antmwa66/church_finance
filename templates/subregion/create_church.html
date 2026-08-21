@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Create Church - Church Finance{% endblock %}
+{% block content %}
+<h2>Create Local Church</h2>
+<form method="POST" action="{{ url_for('subregion_create_church') }}" class="form-card">
+    <div class="form-group">
+        <label for="name">Church Name</label>
+        <input type="text" id="name" name="name" required placeholder="e.g., Grace Community Church">
+    </div>
+    <button type="submit" class="btn btn-primary">Create Church</button>
+    <a href="{{ url_for('subregion_dashboard') }}" class="btn btn-secondary">Back</a>
+</form>
+{% endblock %}

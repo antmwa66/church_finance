@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Regional Allocations - Church Finance{% endblock %}
+{% block content %}
+<h2>Allocations &mdash; {{ region.name if region else 'Region' }}</h2>
+
+<h3>Allocations Received</h3>
+<div class="table-container">
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Category</th>
+                <th>Allocated (KES)</th>
+                <th>Cascaded (KES)</th>
+                <th>Paid (KES)</th>
+                <th>Balance (KES)</th>
+                <th>Date</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for a in allocations %}
+            <tr>
+                <td>{{ a.id }}</td>
+                <td>{{ a.category.name }}</td>
+                <td>{{ '{:,.2f}'.format(a.amount) }}</td>
+                <td>{{ '{:,.2f}'.format(a.cascaded_amount()) }}</td>
+                <td>{{ '{:,.2f}'.format(a.paid_amount()) }}</td>
+                <td>{{ '{:,.2f}'.format(a.balance()) }}</td>
+                <td>{{ a.created_at.strftime('%Y-%m-%d') }}</td>
+                <td>
+                    {% if a.remaining_amount() > 0.001 %}
+                    <a href="{{ url_for('regional_cascade_allocation', allocation_id=a.id) }}" class="btn btn-sm btn-primary">Cascade</a>
+                    {% else %}
+                    <span class="badge badge-success">Fully cascaded</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="7" class="empty-cell">No allocations received for your region yet.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<h3>Cascaded to Sub-Regions</h3>
+<div class="table-container">
+    <table>
+        <thead>
+            <tr>
+                <th>Sub-Region</th>
+                <th>Category</th>
+                <th>Amount (KES)</th>
+                <th>Created By</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for sr in sub_regions %}
+                {% for child in cascaded_by_sub.get(sr.id, []) %}
+                <tr>
+                    <td>{{ sr.name }}</td>
+                    <td>{{ child.category.name }}</td>
+                    <td>{{ '{:,.2f}'.format(child.amount) }}</td>
+                    <td>{{ child.created_by.full_name if child.created_by else '-' }}</td>
+                </tr>
+                {% endfor %}
+            {% endfor %}
+            {% if not sub_regions or cascaded_by_sub|length == 0 %}
+            <tr><td colspan="4" class="empty-cell">Nothing cascaded yet.</td></tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

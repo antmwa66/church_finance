@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Transfer Sub-Region Bishop - Church Finance{% endblock %}
+{% block content %}
+<h2>Transfer Sub-Region Bishop</h2>
+<div class="info-card">
+    <p><strong>Bishop:</strong> {{ sub_bishop.full_name }}</p>
+    <p><strong>Current Sub-Region:</strong> {{ sub_bishop.sub_region.name if sub_bishop.sub_region else 'Not assigned' }}</p>
+</div>
+<form method="POST" action="{{ url_for('regional_transfer_sub_bishop', sub_bishop_id=sub_bishop.id) }}" class="form-card">
+    <div class="form-group">
+        <label for="sub_region_id">Transfer To Sub-Region</label>
+        <select id="sub_region_id" name="sub_region_id" required>
+            <option value="">-- Select Sub-Region --</option>
+            {% for sr in sub_regions %}
+            <option value="{{ sr.id }}">{{ sr.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <button type="submit" class="btn btn-primary">Transfer Bishop</button>
+    <a href="{{ url_for('regional_dashboard') }}" class="btn btn-secondary">Cancel</a>
+</form>
+{% endblock %}

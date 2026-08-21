@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Pastor Dashboard - Church Finance{% endblock %}
+{% block sidebar %}
+{% include "pastor/sidebar.html" %}
+{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Pastor Dashboard</h1>
+    <p>{{ church.name if church else 'My Church' }}</p>
+</div>
+<div class="info-card">
+    <p><strong>Church:</strong> {{ church.name if church else 'Not assigned' }}</p>
+    <p><strong>Sub-Region:</strong> {{ sub_region.name if sub_region else '-' }}</p>
+    <p><strong>Region:</strong> {{ region.name if region else '-' }}</p>
+</div>
+<div class="stats-grid">
+    <div class="stat-card highlight">
+        <div class="stat-icon">💰</div>
+        <div class="stat-info">
+            <h3>{{ my_payments|length }}</h3>
+            <p>My Payments</p>
+        </div>
+    </div>
+    <div class="stat-card highlight">
+        <div class="stat-icon">📊</div>
+        <div class="stat-info">
+            <h3>KES {{ "%.2f"|format(my_total) }}</h3>
+            <p>My Total Amount</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

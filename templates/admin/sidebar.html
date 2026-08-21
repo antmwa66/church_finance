@@ -1,0 +1,45 @@
+{% block sidebar %}
+<div class="menu-section-header">Management</div>
+<a href="{{ url_for('admin_manage_regions') }}" class="nav-item {% if request.endpoint in ['admin_manage_regions'] %}active{% endif %}">
+    <span class="nav-icon">🌍</span>
+    <span class="nav-label">Regions</span>
+</a>
+<a href="{{ url_for('admin_manage_bishops') }}" class="nav-item {% if request.endpoint in ['admin_manage_bishops','admin_transfer_bishop'] %}active{% endif %}">
+    <span class="nav-icon">👔</span>
+    <span class="nav-label">Regional Bishops</span>
+</a>
+<a href="{{ url_for('admin_manage_sub_bishops') }}" class="nav-item {% if request.endpoint == 'admin_manage_sub_bishops' %}active{% endif %}">
+    <span class="nav-icon">📋</span>
+    <span class="nav-label">Sub-Region Bishops</span>
+</a>
+<a href="{{ url_for('admin_manage_pastors') }}" class="nav-item {% if request.endpoint == 'admin_manage_pastors' %}active{% endif %}">
+    <span class="nav-icon">⛪</span>
+    <span class="nav-label">Local Pastors</span>
+</a>
+<a href="{{ url_for('admin_create_region') }}" class="nav-item {% if request.endpoint == 'admin_create_region' %}active{% endif %}">
+    <span class="nav-icon">➕</span>
+    <span class="nav-label">Create Region</span>
+</a>
+<a href="{{ url_for('admin_create_bishop') }}" class="nav-item {% if request.endpoint == 'admin_create_bishop' %}active{% endif %}">
+    <span class="nav-icon">➕</span>
+    <span class="nav-label">Create Bishop</span>
+</a>
+<div class="menu-section-header">Settings</div>
+<a href="{{ url_for('admin_categories') }}" class="nav-item {% if request.endpoint in ['admin_categories','admin_create_category','admin_toggle_category'] %}active{% endif %}">
+    <span class="nav-icon">🏷️</span>
+    <span class="nav-label">Categories</span>
+</a>
+<div class="menu-section-header">Finance</div>
+<a href="{{ url_for('admin_allocations') }}" class="nav-item {% if request.endpoint in ['admin_allocations','admin_create_allocation'] %}active{% endif %}">
+    <span class="nav-icon">🧮</span>
+    <span class="nav-label">Fund Allocations</span>
+</a>
+<a href="{{ url_for('admin_payments') }}" class="nav-item {% if request.endpoint == 'admin_payments' %}active{% endif %}">
+    <span class="nav-icon">💳</span>
+    <span class="nav-label">All Payments</span>
+</a>
+<a href="{{ url_for('admin_accumulative') }}" class="nav-item {% if request.endpoint in ['admin_accumulative','admin_payments_by_category_detail'] %}active{% endif %}">
+    <span class="nav-icon">📊</span>
+    <span class="nav-label">Accumulative Report</span>
+</a>
+{% endblock %}

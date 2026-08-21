@@ -1,0 +1,32 @@
+{% block sidebar %}
+<div class="menu-section-header">Management</div>
+<a href="{{ url_for('regional_create_subregion') }}" class="nav-item {% if request.endpoint == 'regional_create_subregion' %}active{% endif %}">
+    <span class="nav-icon">📋</span>
+    <span class="nav-label">Create Sub-Region</span>
+</a>
+<a href="{{ url_for('regional_create_sub_bishop') }}" class="nav-item {% if request.endpoint == 'regional_create_sub_bishop' %}active{% endif %}">
+    <span class="nav-icon">👔</span>
+    <span class="nav-label">Create Sub-Region Bishop</span>
+</a>
+<a href="{{ url_for('regional_manage_sub_bishops') }}" class="nav-item {% if request.endpoint in ['regional_manage_sub_bishops','regional_transfer_sub_bishop'] %}active{% endif %}">
+    <span class="nav-icon">👥</span>
+    <span class="nav-label">Manage Sub-Region Bishops</span>
+</a>
+<a href="{{ url_for('regional_manage_pastors') }}" class="nav-item {% if request.endpoint == 'regional_manage_pastors' %}active{% endif %}">
+    <span class="nav-icon">⛪</span>
+    <span class="nav-label">Manage Pastors</span>
+</a>
+<div class="menu-section-header">Finance</div>
+<a href="{{ url_for('regional_allocations') }}" class="nav-item {% if request.endpoint in ['regional_allocations','regional_cascade_allocation'] %}active{% endif %}">
+    <span class="nav-icon">🧮</span>
+    <span class="nav-label">Fund Allocations</span>
+</a>
+<a href="{{ url_for('regional_payments') }}" class="nav-item {% if request.endpoint == 'regional_payments' %}active{% endif %}">
+    <span class="nav-icon">💳</span>
+    <span class="nav-label">Payments by Sub-Region</span>
+</a>
+<a href="{{ url_for('regional_payments_by_category') }}" class="nav-item {% if request.endpoint in ['regional_payments_by_category','regional_payments_by_category_detail'] %}active{% endif %}">
+    <span class="nav-icon">📊</span>
+    <span class="nav-label">Payments by Category</span>
+</a>
+{% endblock %}

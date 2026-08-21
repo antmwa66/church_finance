@@ -1,0 +1,15 @@
+{% block sidebar %}
+<div class="menu-section-header">Finance</div>
+<a href="{{ url_for('pastor_allocations') }}" class="nav-item {% if request.endpoint == 'pastor_allocations' %}active{% endif %}">
+    <span class="nav-icon">🧮</span>
+    <span class="nav-label">Fund Allocations</span>
+</a>
+<a href="{{ url_for('pastor_make_payment') }}" class="nav-item {% if request.endpoint == 'pastor_make_payment' %}active{% endif %}">
+    <span class="nav-icon">💳</span>
+    <span class="nav-label">Make Payment</span>
+</a>
+<a href="{{ url_for('pastor_my_payments') }}" class="nav-item {% if request.endpoint in ['pastor_my_payments','pastor_payment_detail'] %}active{% endif %}">
+    <span class="nav-icon">📋</span>
+    <span class="nav-label">My Payments</span>
+</a>
+{% endblock %}

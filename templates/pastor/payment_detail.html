@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Payment Details - Church Finance{% endblock %}
+{% block content %}
+<h2>Payment Details</h2>
+<div class="detail-card">
+    <div class="detail-row">
+        <span class="detail-label">Payment ID:</span>
+        <span>{{ payment.id }}</span>
+    </div>
+    <div class="detail-row">
+        <span class="detail-label">Date:</span>
+        <span>{{ payment.payment_date.strftime('%Y-%m-%d') }}</span>
+    </div>
+    <div class="detail-row">
+        <span class="detail-label">Church:</span>
+        <span>{{ payment.church.name }}</span>
+    </div>
+    <div class="detail-row">
+        <span class="detail-label">Category:</span>
+        <span>{{ payment.category.name if payment.category else '-' }}</span>
+    </div>
+    <div class="detail-row">
+        <span class="detail-label">Paybill Number:</span>
+        <span>{{ payment.paybill_number }}</span>
+    </div>
+    <div class="detail-row">
+        <span class="detail-label">Receipt Reference:</span>
+        <span>{{ payment.receipt_reference }}</span>
+    </div>
+    <div class="detail-row">
+        <span class="detail-label">Amount:</span>
+        <span class="amount">KES {{ "%.2f"|format(payment.amount) }}</span>
+    </div>
+    <div class="detail-row">
+        <span class="detail-label">Notes:</span>
+        <span>{{ payment.notes or '-' }}</span>
+    </div>
+    <div class="detail-row">
+        <span class="detail-label">Recorded On:</span>
+        <span>{{ payment.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+    </div>
+</div>
+<a href="{{ url_for('pastor_my_payments') }}" class="btn btn-secondary">Back to My Payments</a>
+<a href="{{ url_for('pastor_dashboard') }}" class="btn btn-secondary">Back to Dashboard</a>
+{% endblock %}

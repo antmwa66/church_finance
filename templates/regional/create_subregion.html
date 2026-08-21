@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Create Sub-Region - Church Finance{% endblock %}
+{% block content %}
+<h2>Create Sub-Region</h2>
+<form method="POST" action="{{ url_for('regional_create_subregion') }}" class="form-card">
+    <div class="form-group">
+        <label for="name">Sub-Region Name</label>
+        <input type="text" id="name" name="name" required placeholder="e.g., Westlands Sub-Region">
+    </div>
+    <button type="submit" class="btn btn-primary">Create Sub-Region</button>
+    <a href="{{ url_for('regional_dashboard') }}" class="btn btn-secondary">Back</a>
+</form>
+{% endblock %}

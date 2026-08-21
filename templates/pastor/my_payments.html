@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}My Payments - Church Finance{% endblock %}
+{% block content %}
+<h2>My Payments</h2>
+<div class="summary-bar">
+    <span>Total Payments: {{ payments|length }}</span>
+    <span>Total Amount: KES {{ "%.2f"|format(my_total) }}</span>
+</div>
+{% if payments %}
+<div class="table-container">
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Date</th>
+                <th>Category</th>
+                <th>Paybill</th>
+                <th>Receipt Ref</th>
+                <th>Amount (KES)</th>
+                <th>Notes</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in payments %}
+            <tr>
+                <td>{{ p.id }}</td>
+                <td>{{ p.payment_date.strftime('%Y-%m-%d') }}</td>
+                <td>{{ p.category.name if p.category else '-' }}</td>
+                <td>{{ p.paybill_number }}</td>
+                <td>{{ p.receipt_reference }}</td>
+                <td class="amount">KES {{ "%.2f"|format(p.amount) }}</td>
+                <td>{{ p.notes or '-' }}</td>
+                <td>
+                    <a href="{{ url_for('pastor_payment_detail', payment_id=p.id) }}" class="btn btn-sm btn-primary">View</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<p class="empty-state">No payments recorded yet. <a href="{{ url_for('pastor_make_payment') }}">Make your first payment</a>.</p>
+{% endif %}
+<a href="{{ url_for('pastor_dashboard') }}" class="btn btn-secondary">Back to Dashboard</a>
+{% endblock %}

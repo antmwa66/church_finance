@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Payments by Category Detail - Church Finance{% endblock %}
+{% block content %}
+<h2>Category Detail: {{ category.name }}</h2>
+<div class="summary-bar highlight">
+    <span>Total Amount: KES {{ "%.2f"|format(total_amount) }}</span>
+</div>
+<h3>By Sub-Region</h3>
+<div class="table-container">
+    <table>
+        <thead>
+            <tr>
+                <th>Sub-Region</th>
+                <th>Payments Count</th>
+                <th>Total Amount (KES)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for sub_name, count, total in sub_region_breakdown %}
+            <tr>
+                <td>{{ sub_name }}</td>
+                <td>{{ count }}</td>
+                <td class="amount">KES {{ "%.2f"|format(total or 0) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+<h3>By Church</h3>
+<div class="table-container">
+    <table>
+        <thead>
+            <tr>
+                <th>Sub-Region</th>
+                <th>Church</th>
+                <th>Payments Count</th>
+                <th>Total Amount (KES)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for sub_name, church_name, count, total in church_breakdown %}
+            <tr>
+                <td>{{ sub_name }}</td>
+                <td>{{ church_name }}</td>
+                <td>{{ count }}</td>
+                <td class="amount">KES {{ "%.2f"|format(total or 0) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+<a href="{{ url_for('regional_payments_by_category') }}" class="btn btn-secondary">Back to Categories</a>
+<a href="{{ url_for('regional_dashboard') }}" class="btn btn-secondary">Back to Dashboard</a>
+{% endblock %}

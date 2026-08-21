@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Manage Sub-Region Bishops - Church Finance{% endblock %}
+{% block content %}
+<h2>Sub-Region Bishops</h2>
+<div class="table-container">
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Username</th>
+                <th>Full Name</th>
+                <th>Email</th>
+                <th>Phone</th>
+                <th>Region</th>
+                <th>Sub-Region</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for sb in sub_bishops %}
+            <tr>
+                <td>{{ sb.id }}</td>
+                <td>{{ sb.username }}</td>
+                <td>{{ sb.full_name }}</td>
+                <td>{{ sb.email or '-' }}</td>
+                <td>{{ sb.phone or '-' }}</td>
+                <td>{{ sb.region.name if sb.region else '-' }}</td>
+                <td>{{ sb.sub_region.name if sb.sub_region else '-' }}</td>
+                <td>{{ 'Active' if sb.is_active else 'Inactive' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+<a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary">Back to Dashboard</a>
+{% endblock %}

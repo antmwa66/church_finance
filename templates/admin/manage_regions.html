@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Manage Regions - Church Finance{% endblock %}
+{% block content %}
+<h2>Regions</h2>
+<div class="table-container">
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Admin</th>
+                <th>Sub-Regions</th>
+                <th>Bishops</th>
+                <th>Pastors</th>
+                <th>Created</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for region in regions %}
+            <tr>
+                <td>{{ region.id }}</td>
+                <td>{{ region.name }}</td>
+                <td>{{ region.admin.full_name if region.admin else '-' }}</td>
+                <td>{{ region.sub_regions|length }}</td>
+                <td>{{ region.users|length }}</td>
+                <td>
+                    {% set pastor_count = namespace(val=0) %}
+                    {% for sub in region.sub_regions %}
+                        {% for church in sub.churches %}
+                            {% set pastor_count.val = pastor_count.val + church.users|length %}
+                        {% endfor %}
+                    {% endfor %}
+                    {{ pastor_count.val }}
+                </td>
+                <td>{{ region.created_at.strftime('%Y-%m-%d') }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+<a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary">Back to Dashboard</a>
+{% endblock %}

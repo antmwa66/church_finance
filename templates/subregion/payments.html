@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Sub-Region Payments - Church Finance{% endblock %}
+{% block content %}
+<h2>Sub-Region Payments</h2>
+<div class="summary-bar">
+    <span>Total Payments: {{ payments|length }}</span>
+    <span>Total Amount: KES {{ "%.2f"|format(total_amount) }}</span>
+</div>
+<div class="table-container">
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Date</th>
+                <th>Church</th>
+                <th>Pastor</th>
+                <th>Category</th>
+                <th>Paybill</th>
+                <th>Receipt Ref</th>
+                <th>Amount (KES)</th>
+                <th>Notes</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in payments %}
+            <tr>
+                <td>{{ p.id }}</td>
+                <td>{{ p.payment_date.strftime('%Y-%m-%d') }}</td>
+                <td>{{ p.church.name }}</td>
+                <td>{{ p.pastor.full_name }}</td>
+                <td>{{ p.category.name if p.category else '-' }}</td>
+                <td>{{ p.paybill_number }}</td>
+                <td>{{ p.receipt_reference }}</td>
+                <td class="amount">KES {{ "%.2f"|format(p.amount) }}</td>
+                <td>{{ p.notes or '-' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+<a href="{{ url_for('subregion_dashboard') }}" class="btn btn-secondary">Back to Dashboard</a>
+{% endblock %}

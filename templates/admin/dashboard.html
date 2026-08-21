@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Admin Dashboard - Church Finance{% endblock %}
+{% block sidebar %}
+{% include "admin/sidebar.html" %}
+{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Dashboard</h1>
+    <p>Welcome back, {{ session.get('full_name') }}</p>
+</div>
+<div class="stats-grid">
+    <a href="{{ url_for('admin_manage_regions') }}" class="stat-card">
+        <div class="stat-icon">🌍</div>
+        <div class="stat-info">
+            <h3>{{ total_regions }}</h3>
+            <p>Regions</p>
+        </div>
+    </a>
+    <a href="{{ url_for('admin_manage_bishops') }}" class="stat-card">
+        <div class="stat-icon">👔</div>
+        <div class="stat-info">
+            <h3>{{ total_bishops }}</h3>
+            <p>Regional Bishops</p>
+        </div>
+    </a>
+    <a href="{{ url_for('admin_manage_sub_bishops') }}" class="stat-card">
+        <div class="stat-icon">📋</div>
+        <div class="stat-info">
+            <h3>{{ total_sub_bishops }}</h3>
+            <p>Sub-Region Bishops</p>
+        </div>
+    </a>
+    <a href="{{ url_for('admin_manage_pastors') }}" class="stat-card">
+        <div class="stat-icon">⛪</div>
+        <div class="stat-info">
+            <h3>{{ total_pastors }}</h3>
+            <p>Local Pastors</p>
+        </div>
+    </a>
+    <div class="stat-card">
+        <div class="stat-icon">🏷️</div>
+        <div class="stat-info">
+            <h3>{{ total_categories }}</h3>
+            <p>Categories</p>
+        </div>
+    </div>
+    <div class="stat-card highlight">
+        <div class="stat-icon">💰</div>
+        <div class="stat-info">
+            <h3>{{ total_payments }}</h3>
+            <p>Total Payments</p>
+        </div>
+    </div>
+    <div class="stat-card highlight">
+        <div class="stat-icon">📊</div>
+        <div class="stat-info">
+            <h3>KES {{ "%.2f"|format(total_amount) }}</h3>
+            <p>Total Amount</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

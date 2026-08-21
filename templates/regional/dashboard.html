@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Regional Dashboard - Church Finance{% endblock %}
+{% block sidebar %}
+{% include "regional/sidebar.html" %}
+{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Regional Dashboard</h1>
+    <p>{{ region.name if region else 'My Region' }}</p>
+</div>
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-icon">📋</div>
+        <div class="stat-info">
+            <h3>{{ sub_regions|length }}</h3>
+            <p>Sub-Regions</p>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon">👔</div>
+        <div class="stat-info">
+            <h3>{{ sub_bishops|length }}</h3>
+            <p>Sub-Region Bishops</p>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon">⛪</div>
+        <div class="stat-info">
+            <h3>{{ pastors|length }}</h3>
+            <p>Local Pastors</p>
+        </div>
+    </div>
+    <div class="stat-card highlight">
+        <div class="stat-icon">💰</div>
+        <div class="stat-info">
+            <h3>{{ total_payments }}</h3>
+            <p>Payments</p>
+        </div>
+    </div>
+    <div class="stat-card highlight">
+        <div class="stat-icon">📊</div>
+        <div class="stat-info">
+            <h3>KES {{ "%.2f"|format(total_amount) }}</h3>
+            <p>Total Amount</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

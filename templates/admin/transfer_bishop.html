@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Transfer Bishop - Church Finance{% endblock %}
+{% block content %}
+<h2>Transfer Bishop</h2>
+<div class="info-card">
+    <p><strong>Bishop:</strong> {{ bishop.full_name }}</p>
+    <p><strong>Current Region:</strong> {{ bishop.region.name if bishop.region else 'Not assigned' }}</p>
+</div>
+<form method="POST" action="{{ url_for('admin_transfer_bishop', bishop_id=bishop.id) }}" class="form-card">
+    <div class="form-group">
+        <label for="region_id">Transfer To Region</label>
+        <select id="region_id" name="region_id" required>
+            <option value="">-- Select Region --</option>
+            {% for region in regions %}
+            <option value="{{ region.id }}">{{ region.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <button type="submit" class="btn btn-primary">Transfer Bishop</button>
+    <a href="{{ url_for('admin_manage_bishops') }}" class="btn btn-secondary">Cancel</a>
+</form>
+{% endblock %}

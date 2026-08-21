@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Transfer Pastor - Church Finance{% endblock %}
+{% block content %}
+<h2>Transfer Local Pastor</h2>
+<div class="info-card">
+    <p><strong>Pastor:</strong> {{ pastor.full_name }}</p>
+    <p><strong>Current Church:</strong> {{ pastor.church.name if pastor.church else 'Not assigned' }}</p>
+</div>
+<form method="POST" action="{{ url_for('subregion_transfer_pastor', pastor_id=pastor.id) }}" class="form-card">
+    <div class="form-group">
+        <label for="church_id">Transfer To Church</label>
+        <select id="church_id" name="church_id" required>
+            <option value="">-- Select Church --</option>
+            {% for church in churches %}
+            <option value="{{ church.id }}">{{ church.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <button type="submit" class="btn btn-primary">Transfer Pastor</button>
+    <a href="{{ url_for('subregion_dashboard') }}" class="btn btn-secondary">Cancel</a>
+</form>
+{% endblock %}

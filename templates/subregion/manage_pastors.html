@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Manage Local Pastors - Church Finance{% endblock %}
+{% block content %}
+<h2>Local Pastors</h2>
+<div class="table-container">
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Username</th>
+                <th>Full Name</th>
+                <th>Email</th>
+                <th>Phone</th>
+                <th>Church</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for pastor in pastors %}
+            <tr>
+                <td>{{ pastor.id }}</td>
+                <td>{{ pastor.username }}</td>
+                <td>{{ pastor.full_name }}</td>
+                <td>{{ pastor.email or '-' }}</td>
+                <td>{{ pastor.phone or '-' }}</td>
+                <td>{{ pastor.church.name if pastor.church else '-' }}</td>
+                <td>{{ 'Active' if pastor.is_active else 'Inactive' }}</td>
+                <td>
+                    <a href="{{ url_for('subregion_transfer_pastor', pastor_id=pastor.id) }}" class="btn btn-sm btn-primary">Transfer</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+<a href="{{ url_for('subregion_dashboard') }}" class="btn btn-secondary">Back to Dashboard</a>
+{% endblock %}
