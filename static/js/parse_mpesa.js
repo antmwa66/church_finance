@@ -24,7 +24,7 @@ function parseMpesaMessage() {
         if (data.transaction_code) document.getElementById('receipt_reference').value = data.transaction_code;
 
         const paybill = document.getElementById('paybill_number');
-        if (paybill) paybill.value = '522522';
+        if (paybill && data.paybill_number) paybill.value = data.paybill_number;
 
         if (data.payment_date) document.getElementById('payment_date').value = data.payment_date;
 

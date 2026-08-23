@@ -247,6 +247,9 @@ ACCOUNT_CATEGORY_MAP = {
     '1958': 'Bills',
     '6248': 'Church Construction',
     '7163': 'Tithe',
+    # Add more mappings as needed:
+    # '1234': 'Offering',
+    # '5678': 'Donation',
 }
 
 
@@ -275,45 +278,56 @@ def parse_mpesa_message(message):
         'raw_message': message
     }
 
-    transaction_match = re.search(r'([A-Z0-9]{10,12})', message)
-    if transaction_match:
-        result['transaction_code'] = transaction_match.group(1)
-
-    amount_match = re.search(r'KES\s+([\d,]+\.\d{2})', message, re.IGNORECASE)
+    # Extract amount - handle both "Ksh" and "KES" formats
+    amount_match = re.search(r'K(?:sh|ES)\s+([\d,]+\.\d{2})', message, re.IGNORECASE)
     if amount_match:
         result['amount'] = float(amount_match.group(1).replace(',', ''))
 
-    sender_match = re.search(r'from\s+([A-Z][A-Z\s]+?)\s*-\s*(\d{3}\*{3}\d{3}|\d{10,12})', message)
-    if sender_match:
-        result['sender_name'] = sender_match.group(1).strip()
-        result['sender_phone'] = sender_match.group(2)
-
-    paybill_match = re.search(r'Paybill\s+(\d+)', message, re.IGNORECASE)
+    # Extract paybill number
+    paybill_match = re.search(r'Pay\s*(?:Bill|bill)\s+(\d+)', message, re.IGNORECASE)
     if paybill_match:
         result['paybill_number'] = paybill_match.group(1)
-        after = message[paybill_match.end():]
-        acc_match = re.search(r'(\d{3,})', after)
-        if acc_match:
-            result['account_number'] = acc_match.group(1)
-    if not result['account_number']:
-        acc_match = re.search(r'(?:Account|Acc)\.?\s*(\d+)', message, re.IGNORECASE)
-        if acc_match:
-            result['account_number'] = acc_match.group(1)
 
-    if result['account_number']:
-        result['category'] = detect_category(result['account_number'])
+    # Extract account number and get last 4 digits for category detection
+    # Handle format like "131***4378" or just plain numbers
+    acc_match = re.search(r'account\s+(\d+\*{3}\d{4}|\d+)', message, re.IGNORECASE)
+    if acc_match:
+        account_full = acc_match.group(1)
+        # Extract last 4 digits from account number
+        if '*' in account_full:
+            account_suffix = account_full[-4:]
+        else:
+            account_suffix = account_full[-4:] if len(account_full) >= 4 else account_full
+        result['account_number'] = account_full
+        result['category'] = detect_category(account_suffix)
 
+    # Extract transaction code (M-PESA ref)
+    trans_match = re.search(r'(?:M-PESA\s*ref|ref)\s*([A-Z0-9]{8,12})', message, re.IGNORECASE)
+    if trans_match:
+        result['transaction_code'] = trans_match.group(1)
+    else:
+        # Fallback: look for 10-12 character alphanumeric code
+        trans_match = re.search(r'([A-Z0-9]{10,12})', message)
+        if trans_match:
+            result['transaction_code'] = trans_match.group(1)
+
+    # Extract date and time
     dt_match = re.search(
-        r'(?:\bon\s*)?(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})'
-        r'(?:\s+at\s+|\s+)(\d{1,2}:\d{2}\s*(?:AM|PM)?)?',
+        r'on\s+(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})\s+at\s+(\d{1,2}:\d{2}\s*(?:AM|PM)?)',
         message, re.IGNORECASE)
     if dt_match:
         day, month, year, time_part = dt_match.groups()
         year = '20' + year if len(year) == 2 else year
         result['payment_date'] = '{:04d}-{:02d}-{:02d}'.format(int(year), int(month), int(day))
-        if time_part:
-            result['payment_time'] = time_part.strip()
+        result['payment_time'] = time_part.strip()
 
+    # Extract sender name (if available)
+    sender_match = re.search(r'from\s+([A-Z][A-Z\s]+?)\s*-\s*(\d{3}\*{3}\d{3}|\d{10,12})', message)
+    if sender_match:
+        result['sender_name'] = sender_match.group(1).strip()
+        result['sender_phone'] = sender_match.group(2)
+
+    # Extract payment method
     method_match = re.search(r'via\s+([A-Z][A-Za-z\s]+?)(?:\.|$)', message)
     if method_match:
         result['payment_method'] = method_match.group(1).strip()
