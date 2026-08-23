@@ -242,6 +242,23 @@ def role_required(*roles):
     return decorator
 
 
+ACCOUNT_CATEGORY_MAP = {
+    '4378': 'Mission',
+    '1958': 'Bills',
+    '6248': 'Church Construction',
+    '7163': 'Tithe',
+}
+
+
+def detect_category(account_number):
+    if not account_number:
+        return None
+    for suffix, name in ACCOUNT_CATEGORY_MAP.items():
+        if account_number.endswith(suffix):
+            return name
+    return None
+
+
 def parse_mpesa_message(message):
     message = message.strip()
     result = {
@@ -249,7 +266,11 @@ def parse_mpesa_message(message):
         'amount': None,
         'sender_name': None,
         'sender_phone': None,
+        'account_number': None,
+        'category': None,
         'payment_date': None,
+        'payment_time': None,
+        'paybill_number': None,
         'payment_method': None,
         'raw_message': message
     }
@@ -258,7 +279,7 @@ def parse_mpesa_message(message):
     if transaction_match:
         result['transaction_code'] = transaction_match.group(1)
 
-    amount_match = re.search(r'KES\s+([\d,]+\.\d{2})', message)
+    amount_match = re.search(r'KES\s+([\d,]+\.\d{2})', message, re.IGNORECASE)
     if amount_match:
         result['amount'] = float(amount_match.group(1).replace(',', ''))
 
@@ -267,9 +288,31 @@ def parse_mpesa_message(message):
         result['sender_name'] = sender_match.group(1).strip()
         result['sender_phone'] = sender_match.group(2)
 
-    date_match = re.search(r'(\d{4}-\d{2}-\d{2})\s+(\d{1,2}:\d{2}:\d{2}\s*(?:AM|PM)?)', message)
-    if date_match:
-        result['payment_date'] = date_match.group(0)
+    paybill_match = re.search(r'Paybill\s+(\d+)', message, re.IGNORECASE)
+    if paybill_match:
+        result['paybill_number'] = paybill_match.group(1)
+        after = message[paybill_match.end():]
+        acc_match = re.search(r'(\d{3,})', after)
+        if acc_match:
+            result['account_number'] = acc_match.group(1)
+    if not result['account_number']:
+        acc_match = re.search(r'(?:Account|Acc)\.?\s*(\d+)', message, re.IGNORECASE)
+        if acc_match:
+            result['account_number'] = acc_match.group(1)
+
+    if result['account_number']:
+        result['category'] = detect_category(result['account_number'])
+
+    dt_match = re.search(
+        r'(?:\bon\s*)?(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})'
+        r'(?:\s+at\s+|\s+)(\d{1,2}:\d{2}\s*(?:AM|PM)?)?',
+        message, re.IGNORECASE)
+    if dt_match:
+        day, month, year, time_part = dt_match.groups()
+        year = '20' + year if len(year) == 2 else year
+        result['payment_date'] = '{:04d}-{:02d}-{:02d}'.format(int(year), int(month), int(day))
+        if time_part:
+            result['payment_time'] = time_part.strip()
 
     method_match = re.search(r'via\s+([A-Z][A-Za-z\s]+?)(?:\.|$)', message)
     if method_match:
