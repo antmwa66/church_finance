@@ -247,9 +247,10 @@ ACCOUNT_CATEGORY_MAP = {
     '1958': 'Bills',
     '6248': 'Church Construction',
     '7163': 'Tithe',
-    # Add more mappings as needed:
-    # '1234': 'Offering',
-    # '5678': 'Donation',
+    '1111': 'Offering',
+    '2222': 'Donation',
+    # Add more account suffix to category mappings as needed
+    # Format: 'last_4_digits': 'Category Name'
 }
 
 
