@@ -302,15 +302,20 @@ def parse_mpesa_message(message):
         result['account_number'] = account_full
         result['category'] = detect_category(account_suffix)
 
-    # Extract transaction code (M-PESA ref)
-    trans_match = re.search(r'(?:M-PESA\s*ref|ref)\s*([A-Z0-9]{8,12})', message, re.IGNORECASE)
+    # Extract transaction code (M-PESA ref) - more specific pattern
+    trans_match = re.search(r'M-PESA\s+ref\s+([A-Z0-9]{8,12})', message, re.IGNORECASE)
     if trans_match:
         result['transaction_code'] = trans_match.group(1)
     else:
-        # Fallback: look for 10-12 character alphanumeric code
-        trans_match = re.search(r'([A-Z0-9]{10,12})', message)
+        # Fallback: look for code that appears after "ref" or at end of message
+        trans_match = re.search(r'ref\s+([A-Z0-9]{8,12})', message, re.IGNORECASE)
         if trans_match:
             result['transaction_code'] = trans_match.group(1)
+        else:
+            # Last resort: look for typical M-PESA transaction code pattern
+            trans_match = re.search(r'\b([A-Z0-9]{8,12})\b', message)
+            if trans_match:
+                result['transaction_code'] = trans_match.group(1)
 
     # Extract date and time
     dt_match = re.search(
@@ -386,6 +391,7 @@ def api_parse_mpesa_message():
     if not message:
         return jsonify({'error': 'Message is required'}), 400
     parsed = parse_mpesa_message(message)
+    print(f"API parsed result: {parsed}")  # Debug logging
     return jsonify(parsed)
 
 

@@ -15,24 +15,46 @@ function parseMpesaMessage() {
     })
     .then(res => res.json())
     .then(data => {
+        console.log('Parsed data:', data); // Debug logging
         if (data.error) {
             status.textContent = data.error;
             status.style.color = 'red';
             return;
         }
-        if (data.amount) document.getElementById('amount').value = data.amount;
-        if (data.transaction_code) document.getElementById('receipt_reference').value = data.transaction_code;
 
+        // Clear previous values first
+        document.getElementById('amount').value = '';
+        document.getElementById('receipt_reference').value = '';
         const paybill = document.getElementById('paybill_number');
-        if (paybill && data.paybill_number) paybill.value = data.paybill_number;
-
-        if (data.payment_date) document.getElementById('payment_date').value = data.payment_date;
-
+        if (paybill) paybill.value = '';
         const sel = document.getElementById('category_id');
+        if (sel) sel.value = '';
+
+        // Set new values
+        if (data.amount) {
+            document.getElementById('amount').value = data.amount;
+            console.log('Set amount:', data.amount);
+        }
+        if (data.transaction_code) {
+            document.getElementById('receipt_reference').value = data.transaction_code;
+            console.log('Set transaction code:', data.transaction_code);
+        }
+
+        if (paybill && data.paybill_number) {
+            paybill.value = data.paybill_number;
+            console.log('Set paybill:', data.paybill_number);
+        }
+
+        if (data.payment_date) {
+            document.getElementById('payment_date').value = data.payment_date;
+            console.log('Set payment date:', data.payment_date);
+        }
+
         if (sel && data.category) {
             for (const opt of sel.options) {
                 if (opt.text.trim().toLowerCase() === data.category.toLowerCase()) {
                     sel.value = opt.value;
+                    console.log('Set category:', data.category);
                     break;
                 }
             }
@@ -43,7 +65,7 @@ function parseMpesaMessage() {
         if (data.payment_time) notes += (notes ? '; ' : '') + 'Time: ' + data.payment_time;
         if (notes) document.getElementById('notes').value = notes;
 
-        status.textContent = 'Parsed successfully.';
+        status.textContent = 'Parsed successfully. Amount: ' + (data.amount || 'N/A') + ', Category: ' + (data.category || 'N/A') + ', Paybill: ' + (data.paybill_number || 'N/A');
         status.style.color = 'green';
     })
     .catch(err => {
