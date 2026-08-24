@@ -1054,12 +1054,11 @@ def admin_regions_report():
     pdf_data = buffer.getvalue()
     buffer.close()
     
-    # Send the PDF
+    # Send the PDF for viewing in browser
     response = send_file(
         BytesIO(pdf_data),
         mimetype='application/pdf',
-        as_attachment=True,
-        download_name=f'regional_report_{datetime.now().strftime("%Y%m%d_%H%M%S")}.pdf'
+        as_attachment=False  # This will display in browser instead of forcing download
     )
     
     return response
