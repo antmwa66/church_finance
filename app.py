@@ -916,46 +916,82 @@ def admin_regions_report():
     sub_region_data = []
     
     for region in regions:
-        # Get regional bishop full name
-        regional_bishop = User.query.filter_by(id=region.admin_id).first()
+        # Get regional bishop full name by role and region
+        regional_bishop = User.query.filter_by(role='regional_bishop', region_id=region.id).first()
         regional_bishop_name = regional_bishop.full_name if regional_bishop else 'N/A'
         
         # Get all sub-regions for this region
         sub_regions = SubRegion.query.filter_by(region_id=region.id).all()
         
         for sub_region in sub_regions:
-            # Get sub-region bishop
-            sub_region_bishop = User.query.filter_by(sub_region_id=sub_region.id, role='sub_region_bishop').first()
-            sub_region_bishop_name = sub_region_bishop.full_name if sub_region_bishop else 'N/A'
+            # Get all sub-region bishops by role and sub_region (handle multiple bishops)
+            sub_region_bishops = User.query.filter_by(role='sub_region_bishop', sub_region_id=sub_region.id).all()
             
-            # Calculate allocation for this sub-region
-            sub_region_allocation = db.session.query(db.func.sum(Allocation.amount)).filter(
-                Allocation.level == 'sub_region', Allocation.target_id == sub_region.id).scalar() or 0
-            
-            # Calculate contributed for this sub-region
-            sub_region_church_ids = [c.id for c in Church.query.filter_by(sub_region_id=sub_region.id).all()]
-            sub_region_contributed = 0
-            if sub_region_church_ids:
-                church_allocations = [a.id for a in Allocation.query.filter(
-                    Allocation.level == 'church', Allocation.target_id.in_(sub_region_church_ids)).all()]
-                if church_allocations:
-                    sub_region_contributed = db.session.query(db.func.sum(Payment.amount)).filter(
-                        Payment.allocation_id.in_(church_allocations)).scalar() or 0
-            
-            # Calculate balance and percentage
-            balance = sub_region_allocation - sub_region_contributed
-            percentage = (sub_region_contributed / sub_region_allocation * 100) if sub_region_allocation > 0 else 0
-            
-            # Store data for sorting
-            sub_region_data.append({
-                'regional_bishop': regional_bishop_name,
-                'sub_region_name': sub_region.name,
-                'sub_region_bishop': sub_region_bishop_name,
-                'allocation': sub_region_allocation,
-                'contributed': sub_region_contributed,
-                'balance': balance,
-                'percentage': percentage
-            })
+            # If no bishops assigned, still create a row for the sub-region
+            if not sub_region_bishops:
+                sub_region_bishop_name = 'N/A'
+                
+                # Calculate allocation for this sub-region
+                sub_region_allocation = db.session.query(db.func.sum(Allocation.amount)).filter(
+                    Allocation.level == 'sub_region', Allocation.target_id == sub_region.id).scalar() or 0
+                
+                # Calculate contributed for this sub-region
+                sub_region_church_ids = [c.id for c in Church.query.filter_by(sub_region_id=sub_region.id).all()]
+                sub_region_contributed = 0
+                if sub_region_church_ids:
+                    church_allocations = [a.id for a in Allocation.query.filter(
+                        Allocation.level == 'church', Allocation.target_id.in_(sub_region_church_ids)).all()]
+                    if church_allocations:
+                        sub_region_contributed = db.session.query(db.func.sum(Payment.amount)).filter(
+                            Payment.allocation_id.in_(church_allocations)).scalar() or 0
+                
+                # Calculate balance and percentage
+                balance = sub_region_allocation - sub_region_contributed
+                percentage = (sub_region_contributed / sub_region_allocation * 100) if sub_region_allocation > 0 else 0
+                
+                # Store data for sorting
+                sub_region_data.append({
+                    'regional_bishop': regional_bishop_name,
+                    'sub_region_name': sub_region.name,
+                    'sub_region_bishop': sub_region_bishop_name,
+                    'allocation': sub_region_allocation,
+                    'contributed': sub_region_contributed,
+                    'balance': balance,
+                    'percentage': percentage
+                })
+            else:
+                # Create a row for each bishop in this sub-region
+                for sub_region_bishop in sub_region_bishops:
+                    sub_region_bishop_name = sub_region_bishop.full_name
+                    
+                    # Calculate allocation for this sub-region
+                    sub_region_allocation = db.session.query(db.func.sum(Allocation.amount)).filter(
+                        Allocation.level == 'sub_region', Allocation.target_id == sub_region.id).scalar() or 0
+                    
+                    # Calculate contributed for this sub-region
+                    sub_region_church_ids = [c.id for c in Church.query.filter_by(sub_region_id=sub_region.id).all()]
+                    sub_region_contributed = 0
+                    if sub_region_church_ids:
+                        church_allocations = [a.id for a in Allocation.query.filter(
+                            Allocation.level == 'church', Allocation.target_id.in_(sub_region_church_ids)).all()]
+                        if church_allocations:
+                            sub_region_contributed = db.session.query(db.func.sum(Payment.amount)).filter(
+                                Payment.allocation_id.in_(church_allocations)).scalar() or 0
+                    
+                    # Calculate balance and percentage
+                    balance = sub_region_allocation - sub_region_contributed
+                    percentage = (sub_region_contributed / sub_region_allocation * 100) if sub_region_allocation > 0 else 0
+                    
+                    # Store data for sorting
+                    sub_region_data.append({
+                        'regional_bishop': regional_bishop_name,
+                        'sub_region_name': sub_region.name,
+                        'sub_region_bishop': sub_region_bishop_name,
+                        'allocation': sub_region_allocation,
+                        'contributed': sub_region_contributed,
+                        'balance': balance,
+                        'percentage': percentage
+                    })
     
     # Sort by percentage from highest to lowest
     sub_region_data.sort(key=lambda x: x['percentage'], reverse=True)
