@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Edit Church - Church Finance{% endblock %}
+{% block content %}
+<h2>Edit Church</h2>
+<div class="form-container">
+    <form method="POST" action="{{ url_for('subregion_edit_church', church_id=church.id) }}">
+        <div class="form-group">
+            <label for="name">Church Name</label>
+            <input type="text" id="name" name="name" value="{{ church.name }}" required autofocus>
+        </div>
+        <button type="submit" class="btn btn-primary">Update Church</button>
+        <a href="{{ url_for('subregion_manage_churches') }}" class="btn btn-secondary">Cancel</a>
+    </form>
+</div>
+{% endblock %}

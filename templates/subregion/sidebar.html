@@ -4,6 +4,10 @@
     <span class="nav-icon">⛪</span>
     <span class="nav-label">Create Church</span>
 </a>
+<a href="{{ url_for('subregion_manage_churches') }}" class="nav-item {% if request.endpoint in ['subregion_manage_churches','subregion_edit_church','subregion_delete_church','subregion_toggle_church'] %}active{% endif %}">
+    <span class="nav-icon">🏢</span>
+    <span class="nav-label">Manage Churches</span>
+</a>
 <a href="{{ url_for('subregion_create_pastor') }}" class="nav-item {% if request.endpoint == 'subregion_create_pastor' %}active{% endif %}">
     <span class="nav-icon">👤</span>
     <span class="nav-label">Create Local Pastor</span>

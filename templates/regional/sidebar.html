@@ -8,9 +8,13 @@
     <span class="nav-icon">👔</span>
     <span class="nav-label">Create Sub-Region Bishop</span>
 </a>
-<a href="{{ url_for('regional_manage_sub_bishops') }}" class="nav-item {% if request.endpoint in ['regional_manage_sub_bishops','regional_transfer_sub_bishop'] %}active{% endif %}">
+<a href="{{ url_for('regional_manage_sub_bishops') }}" class="nav-item {% if request.endpoint in ['regional_manage_sub_bishops','regional_transfer_sub_bishop','regional_edit_sub_bishop','regional_delete_sub_bishop','regional_toggle_sub_bishop'] %}active{% endif %}">
     <span class="nav-icon">👥</span>
     <span class="nav-label">Manage Sub-Region Bishops</span>
+</a>
+<a href="{{ url_for('regional_manage_subregions') }}" class="nav-item {% if request.endpoint in ['regional_manage_subregions','regional_edit_subregion','regional_delete_subregion','regional_toggle_subregion'] %}active{% endif %}">
+    <span class="nav-icon">📋</span>
+    <span class="nav-label">Manage Sub-Regions</span>
 </a>
 <a href="{{ url_for('regional_manage_pastors') }}" class="nav-item {% if request.endpoint == 'regional_manage_pastors' %}active{% endif %}">
     <span class="nav-icon">⛪</span>

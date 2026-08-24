@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Edit Local Pastor - Church Finance{% endblock %}
+{% block content %}
+<h2>Edit Local Pastor</h2>
+<div class="form-container">
+    <form method="POST" action="{{ url_for('subregion_edit_pastor', pastor_id=pastor.id) }}">
+        <div class="form-group">
+            <label for="full_name">Full Name</label>
+            <input type="text" id="full_name" name="full_name" value="{{ pastor.full_name }}" required autofocus>
+        </div>
+        <div class="form-group">
+            <label for="email">Email</label>
+            <input type="email" id="email" name="email" value="{{ pastor.email or '' }}">
+        </div>
+        <div class="form-group">
+            <label for="phone">Phone</label>
+            <input type="text" id="phone" name="phone" value="{{ pastor.phone or '' }}">
+        </div>
+        <div class="form-group">
+            <label for="church_id">Church</label>
+            <select id="church_id" name="church_id" required>
+                {% for ch in churches %}
+                <option value="{{ ch.id }}" {% if pastor.church_id == ch.id %}selected{% endif %}>{{ ch.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary">Update Pastor</button>
+        <a href="{{ url_for('subregion_manage_pastors') }}" class="btn btn-secondary">Cancel</a>
+    </form>
+</div>
+{% endblock %}

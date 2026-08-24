@@ -80,6 +80,7 @@ class SubRegion(db.Model):
     name = db.Column(db.String(100), nullable=False)
     region_id = db.Column(db.Integer, db.ForeignKey('region.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    is_active = db.Column(db.Boolean, default=True)
 
     churches = db.relationship('Church', backref='sub_region', lazy=True, cascade='all, delete-orphan')
 
@@ -89,6 +90,7 @@ class Church(db.Model):
     name = db.Column(db.String(200), nullable=False)
     sub_region_id = db.Column(db.Integer, db.ForeignKey('sub_region.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    is_active = db.Column(db.Boolean, default=True)
 
     payments = db.relationship('Payment', backref='church', lazy=True, cascade='all, delete-orphan')
 
@@ -381,6 +383,8 @@ def migrate_db():
         inspector = db.inspect(db.engine)
         user_cols = [c['name'] for c in inspector.get_columns('user')]
         payment_cols = [c['name'] for c in inspector.get_columns('payment')]
+        subregion_cols = [c['name'] for c in inspector.get_columns('sub_region')]
+        church_cols = [c['name'] for c in inspector.get_columns('church')]
         with db.engine.begin() as conn:
             if 'reset_token' not in user_cols:
                 conn.execute(text('ALTER TABLE "user" ADD COLUMN reset_token VARCHAR(120)'))
@@ -388,6 +392,10 @@ def migrate_db():
                 conn.execute(text('ALTER TABLE "user" ADD COLUMN reset_token_expiry DATETIME'))
             if 'allocation_id' not in payment_cols:
                 conn.execute(text('ALTER TABLE "payment" ADD COLUMN allocation_id INTEGER'))
+            if 'is_active' not in subregion_cols:
+                conn.execute(text('ALTER TABLE sub_region ADD COLUMN is_active BOOLEAN DEFAULT TRUE'))
+            if 'is_active' not in church_cols:
+                conn.execute(text('ALTER TABLE church ADD COLUMN is_active BOOLEAN DEFAULT TRUE'))
 
 
 @app.route('/api/parse-mpesa-message', methods=['POST'])
@@ -1454,6 +1462,25 @@ def regional_delete_subregion(subregion_id):
     return redirect(url_for('regional_manage_subregions'))
 
 
+@app.route('/regional/toggle_subregion/<int:subregion_id>', methods=['POST'])
+@login_required
+@role_required('regional_bishop')
+def regional_toggle_subregion(subregion_id):
+    user = User.query.get(session['user_id'])
+    subregion = SubRegion.query.get_or_404(subregion_id)
+    
+    # Verify the subregion belongs to this regional bishop's region
+    if subregion.region_id != user.region_id:
+        flash('You do not have permission to deactivate this subregion.', 'danger')
+        return redirect(url_for('regional_manage_subregions'))
+    
+    subregion.is_active = not subregion.is_active
+    db.session.commit()
+    status = 'activated' if subregion.is_active else 'deactivated'
+    flash('Subregion has been {}.'.format(status), 'success')
+    return redirect(url_for('regional_manage_subregions'))
+
+
 @app.route('/regional/manage_pastors')
 @login_required
 @role_required('regional_bishop')
@@ -1618,6 +1645,70 @@ def subregion_create_pastor():
     return render_template('subregion/create_pastor.html', churches=churches)
 
 
+@app.route('/subregion/manage_churches')
+@login_required
+@role_required('sub_region_bishop')
+def subregion_manage_churches():
+    user = User.query.get(session['user_id'])
+    churches = Church.query.filter_by(sub_region_id=user.sub_region_id).all() if user.sub_region_id else []
+    return render_template('subregion/manage_churches.html', churches=churches)
+
+
+@app.route('/subregion/edit_church/<int:church_id>', methods=['GET', 'POST'])
+@login_required
+@role_required('sub_region_bishop')
+def subregion_edit_church(church_id):
+    user = User.query.get(session['user_id'])
+    church = Church.query.get_or_404(church_id)
+    
+    if church.sub_region_id != user.sub_region_id:
+        flash('You do not have permission to edit this church.', 'danger')
+        return redirect(url_for('subregion_manage_churches'))
+    
+    if request.method == 'POST':
+        church.name = request.form.get('name', '').strip()
+        db.session.commit()
+        flash('Church updated successfully.', 'success')
+        return redirect(url_for('subregion_manage_churches'))
+    
+    return render_template('subregion/edit_church.html', church=church)
+
+
+@app.route('/subregion/delete_church/<int:church_id>', methods=['POST'])
+@login_required
+@role_required('sub_region_bishop')
+def subregion_delete_church(church_id):
+    user = User.query.get(session['user_id'])
+    church = Church.query.get_or_404(church_id)
+    
+    if church.sub_region_id != user.sub_region_id:
+        flash('You do not have permission to delete this church.', 'danger')
+        return redirect(url_for('subregion_manage_churches'))
+    
+    db.session.delete(church)
+    db.session.commit()
+    flash('Church deleted successfully.', 'success')
+    return redirect(url_for('subregion_manage_churches'))
+
+
+@app.route('/subregion/toggle_church/<int:church_id>', methods=['POST'])
+@login_required
+@role_required('sub_region_bishop')
+def subregion_toggle_church(church_id):
+    user = User.query.get(session['user_id'])
+    church = Church.query.get_or_404(church_id)
+    
+    if church.sub_region_id != user.sub_region_id:
+        flash('You do not have permission to deactivate this church.', 'danger')
+        return redirect(url_for('subregion_manage_churches'))
+    
+    church.is_active = not church.is_active
+    db.session.commit()
+    status = 'activated' if church.is_active else 'deactivated'
+    flash('Church has been {}.'.format(status), 'success')
+    return redirect(url_for('subregion_manage_churches'))
+
+
 @app.route('/subregion/transfer_pastor/<int:pastor_id>', methods=['GET', 'POST'])
 @login_required
 @role_required('sub_region_bishop')
@@ -1647,6 +1738,65 @@ def subregion_manage_pastors():
     user = User.query.get(session['user_id'])
     pastors = User.query.filter_by(role='local_pastor', sub_region_id=user.sub_region_id).all()
     return render_template('subregion/manage_pastors.html', pastors=pastors)
+
+
+@app.route('/subregion/edit_pastor/<int:pastor_id>', methods=['GET', 'POST'])
+@login_required
+@role_required('sub_region_bishop')
+def subregion_edit_pastor(pastor_id):
+    user = User.query.get(session['user_id'])
+    pastor = User.query.get_or_404(pastor_id)
+    
+    if pastor.role != 'local_pastor' or pastor.sub_region_id != user.sub_region_id:
+        flash('You do not have permission to edit this pastor.', 'danger')
+        return redirect(url_for('subregion_manage_pastors'))
+    
+    if request.method == 'POST':
+        pastor.full_name = request.form.get('full_name', '').strip()
+        pastor.email = request.form.get('email', '').strip()
+        pastor.phone = request.form.get('phone', '').strip()
+        pastor.church_id = request.form.get('church_id', type=int)
+        db.session.commit()
+        flash('Pastor updated successfully.', 'success')
+        return redirect(url_for('subregion_manage_pastors'))
+    
+    churches = Church.query.filter_by(sub_region_id=user.sub_region_id).all() if user.sub_region_id else []
+    return render_template('subregion/edit_pastor.html', pastor=pastor, churches=churches)
+
+
+@app.route('/subregion/delete_pastor/<int:pastor_id>', methods=['POST'])
+@login_required
+@role_required('sub_region_bishop')
+def subregion_delete_pastor(pastor_id):
+    user = User.query.get(session['user_id'])
+    pastor = User.query.get_or_404(pastor_id)
+    
+    if pastor.role != 'local_pastor' or pastor.sub_region_id != user.sub_region_id:
+        flash('You do not have permission to delete this pastor.', 'danger')
+        return redirect(url_for('subregion_manage_pastors'))
+    
+    db.session.delete(pastor)
+    db.session.commit()
+    flash('Pastor deleted successfully.', 'success')
+    return redirect(url_for('subregion_manage_pastors'))
+
+
+@app.route('/subregion/toggle_pastor/<int:pastor_id>', methods=['POST'])
+@login_required
+@role_required('sub_region_bishop')
+def subregion_toggle_pastor(pastor_id):
+    user = User.query.get(session['user_id'])
+    pastor = User.query.get_or_404(pastor_id)
+    
+    if pastor.role != 'local_pastor' or pastor.sub_region_id != user.sub_region_id:
+        flash('You do not have permission to deactivate this pastor.', 'danger')
+        return redirect(url_for('subregion_manage_pastors'))
+    
+    pastor.is_active = not pastor.is_active
+    db.session.commit()
+    status = 'activated' if pastor.is_active else 'deactivated'
+    flash('Pastor has been {}.'.format(status), 'success')
+    return redirect(url_for('subregion_manage_pastors'))
 
 
 @app.route('/subregion/payments')
