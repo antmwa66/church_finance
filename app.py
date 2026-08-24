@@ -1,14 +1,20 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_file
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, date, timedelta
 from functools import wraps
+from io import BytesIO
 import os
 import re
 import secrets
 import smtplib
 from email.message import EmailMessage
 from sqlalchemy import text
+from reportlab.lib.pagesizes import letter, A4
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 
 app = Flask(__name__)
 
@@ -890,6 +896,169 @@ def admin_toggle_user(user_id):
     status = 'activated' if user.is_active else 'deactivated'
     flash('User "{}" has been {}.'.format(user.full_name, status), 'success')
     return redirect(request.referrer or url_for('admin_dashboard'))
+
+
+@app.route('/admin/regions_report')
+@login_required
+@role_required('admin')
+def admin_regions_report():
+    # Generate PDF report
+    from io import BytesIO
+    
+    # Create a buffer for the PDF
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=0.5*inch, bottomMargin=0.5*inch, leftMargin=0.5*inch, rightMargin=0.5*inch)
+    
+    # Get all regions with their data
+    regions = Region.query.all()
+    
+    # Prepare data for the table
+    data = [['Regional Bishop', 'Sub Regions', 'Sub Region Bishop', 'Allocation', 'Contributed', 'Balance', 'Percentage Achieved']]
+    
+    total_allocation = 0
+    total_contributed = 0
+    
+    for region in regions:
+        regional_bishop = region.admin.full_name if region.admin else 'N/A'
+        
+        # Get all sub-regions for this region
+        sub_regions = SubRegion.query.filter_by(region_id=region.id).all()
+        sub_region_names = ', '.join([sr.name for sr in sub_regions]) if sub_regions else 'N/A'
+        
+        # Get sub-region bishops
+        sub_region_bishops = User.query.filter_by(role='sub_region_bishop').filter(User.sub_region_id.in_([sr.id for sr in sub_regions])).all()
+        sub_region_bishop_names = ', '.join([bishop.full_name for bishop in sub_region_bishops]) if sub_region_bishops else 'N/A'
+        
+        # Calculate total allocation for this region
+        region_allocation = db.session.query(db.func.sum(Allocation.amount)).filter(
+            Allocation.level == 'region', Allocation.target_id == region.id).scalar() or 0
+        
+        # Calculate total contributed for this region
+        region_contributed = region_paid_amount(region.id)
+        
+        # Calculate balance and percentage
+        balance = region_allocation - region_contributed
+        percentage = (region_contributed / region_allocation * 100) if region_allocation > 0 else 0
+        
+        # Determine color based on percentage
+        if percentage < 50:
+            color = colors.red
+        elif percentage < 100:
+            color = colors.yellow
+        else:
+            color = colors.green
+        
+        # Add row to data with color indicator
+        data.append([
+            regional_bishop,
+            sub_region_names,
+            sub_region_bishop_names,
+            f'{region_allocation:,.2f}',
+            f'{region_contributed:,.2f}',
+            f'{balance:,.2f}',
+            f'{percentage:.1f}%'
+        ])
+        
+        total_allocation += region_allocation
+        total_contributed += region_contributed
+    
+    # Add total row
+    total_balance = total_allocation - total_contributed
+    total_percentage = (total_contributed / total_allocation * 100) if total_allocation > 0 else 0
+    
+    total_color = colors.red if total_percentage < 50 else (colors.yellow if total_percentage < 100 else colors.green)
+    
+    data.append([
+        'TOTAL',
+        '',
+        '',
+        f'{total_allocation:,.2f}',
+        f'{total_contributed:,.2f}',
+        f'{total_balance:,.2f}',
+        f'{total_percentage:.1f}%'
+    ])
+    
+    # Create table
+    table = Table(data, colWidths=[1.5*inch, 1.5*inch, 1.5*inch, 1*inch, 1*inch, 1*inch, 1*inch])
+    
+    # Style the table
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 1), (-1, -1), 9),
+        ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey),
+        ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+    ]))
+    
+    # Add color coding for percentage column
+    for i in range(1, len(data) - 1):  # Skip header and total row
+        percentage_str = data[i][6]
+        if percentage_str:
+            percentage = float(percentage_str.replace('%', ''))
+            if percentage < 50:
+                table.setStyle(TableStyle([('TEXTCOLOR', (6, i), (6, i), colors.red)]))
+            elif percentage < 100:
+                table.setStyle(TableStyle([('TEXTCOLOR', (6, i), (6, i), colors.orange)]))
+            else:
+                table.setStyle(TableStyle([('TEXTCOLOR', (6, i), (6, i), colors.green)]))
+    
+    # Color the total row percentage
+    if total_percentage < 50:
+        table.setStyle(TableStyle([('TEXTCOLOR', (6, -1), (6, -1), colors.red)]))
+    elif total_percentage < 100:
+        table.setStyle(TableStyle([('TEXTCOLOR', (6, -1), (6, -1), colors.orange)]))
+    else:
+        table.setStyle(TableStyle([('TEXTCOLOR', (6, -1), (6, -1), colors.green)]))
+    
+    # Build the PDF
+    elements = []
+    
+    # Add title
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=getSampleStyleSheet()['Heading1'],
+        fontSize=16,
+        spaceAfter=20,
+        alignment=1  # Center
+    )
+    elements.append(Paragraph("Regional Financial Report", title_style))
+    elements.append(Spacer(1, 0.2*inch))
+    
+    # Add date
+    date_style = ParagraphStyle(
+        'CustomDate',
+        parent=getSampleStyleSheet()['Normal'],
+        fontSize=10,
+        alignment=1  # Center
+    )
+    elements.append(Paragraph(f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M')}", date_style))
+    elements.append(Spacer(1, 0.2*inch))
+    
+    elements.append(table)
+    
+    doc.build(elements)
+    
+    # Get the PDF from the buffer
+    buffer.seek(0)
+    pdf_data = buffer.getvalue()
+    buffer.close()
+    
+    # Send the PDF
+    response = send_file(
+        BytesIO(pdf_data),
+        mimetype='application/pdf',
+        as_attachment=True,
+        download_name=f'regional_report_{datetime.now().strftime("%Y%m%d_%H%M%S")}.pdf'
+    )
+    
+    return response
 
 
 # ==================== REGIONAL BISHOP ROUTES ====================

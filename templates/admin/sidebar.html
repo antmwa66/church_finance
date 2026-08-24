@@ -42,4 +42,8 @@
     <span class="nav-icon">📊</span>
     <span class="nav-label">Accumulative Report</span>
 </a>
+<a href="{{ url_for('admin_regions_report') }}" class="nav-item {% if request.endpoint == 'admin_regions_report' %}active{% endif %}">
+    <span class="nav-icon">📄</span>
+    <span class="nav-label">Regional PDF Report</span>
+</a>
 {% endblock %}
