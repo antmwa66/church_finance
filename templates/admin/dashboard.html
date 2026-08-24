@@ -7,7 +7,16 @@
 <div class="page-header">
     <h1>Dashboard</h1>
     <p>Welcome back, {{ session.get('full_name') }}</p>
-    <a href="{{ url_for('admin_regions_report') }}" class="btn btn-primary" style="margin-top: 10px;">📊 Generate Regional Report (PDF)</a>
+    <div style="margin-top: 10px;">
+        <form action="{{ url_for('admin_regions_report') }}" method="GET" style="display: inline;">
+            <label>Filter by Percentage: </label>
+            <input type="number" name="min_percentage" placeholder="Min %" step="0.1" style="width: 80px;">
+            <span>to</span>
+            <input type="number" name="max_percentage" placeholder="Max %" step="0.1" style="width: 80px;">
+            <button type="submit" class="btn btn-primary">📊 Generate Regional Report (PDF)</button>
+        </form>
+        <a href="{{ url_for('admin_regions_report') }}" class="btn btn-secondary" style="margin-left: 10px;">Show All</a>
+    </div>
 </div>
 <div class="stats-grid">
     <a href="{{ url_for('admin_manage_regions') }}" class="stat-card">

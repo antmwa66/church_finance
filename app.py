@@ -10,7 +10,7 @@ import secrets
 import smtplib
 from email.message import EmailMessage
 from sqlalchemy import text
-from reportlab.lib.pagesizes import letter, A4
+from reportlab.lib.pagesizes import letter, A4, landscape
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
@@ -902,74 +902,83 @@ def admin_toggle_user(user_id):
 @login_required
 @role_required('admin')
 def admin_regions_report():
+    # Get percentage filter from query parameters
+    min_percentage = request.args.get('min_percentage', type=float)
+    max_percentage = request.args.get('max_percentage', type=float)
+    
     # Generate PDF report
     from io import BytesIO
     
-    # Create a buffer for the PDF
+    # Create a buffer for the PDF with landscape orientation
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=0.5*inch, bottomMargin=0.5*inch, leftMargin=0.5*inch, rightMargin=0.5*inch)
+    doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), topMargin=0.5*inch, bottomMargin=0.5*inch, leftMargin=0.5*inch, rightMargin=0.5*inch)
     
     # Get all regions with their data
     regions = Region.query.all()
     
     # Prepare data for the table
-    data = [['S.No', 'Regional Bishop', 'Sub Regions', 'Sub Region Bishop', 'Allocation', 'Contributed', 'Balance', 'Percentage Achieved']]
+    data = [['S.No', 'Regional Bishop', 'Sub Region', 'Sub Region Bishop', 'Allocation', 'Contributed', 'Balance', 'Percentage Achieved']]
     
     total_allocation = 0
     total_contributed = 0
     serial_number = 1
     
     for region in regions:
-        regional_bishop = region.admin.full_name if region.admin else 'N/A'
+        # Get regional bishop full name
+        regional_bishop = User.query.filter_by(id=region.admin_id).first()
+        regional_bishop_name = regional_bishop.full_name if regional_bishop else 'N/A'
         
         # Get all sub-regions for this region
         sub_regions = SubRegion.query.filter_by(region_id=region.id).all()
-        sub_region_names = ', '.join([sr.name for sr in sub_regions]) if sub_regions else 'N/A'
         
-        # Get sub-region bishops
-        sub_region_bishops = User.query.filter_by(role='sub_region_bishop').filter(User.sub_region_id.in_([sr.id for sr in sub_regions])).all()
-        sub_region_bishop_names = ', '.join([bishop.full_name for bishop in sub_region_bishops]) if sub_region_bishops else 'N/A'
-        
-        # Calculate total allocation for this region
-        region_allocation = db.session.query(db.func.sum(Allocation.amount)).filter(
-            Allocation.level == 'region', Allocation.target_id == region.id).scalar() or 0
-        
-        # Calculate total contributed for this region
-        region_contributed = region_paid_amount(region.id)
-        
-        # Calculate balance and percentage
-        balance = region_allocation - region_contributed
-        percentage = (region_contributed / region_allocation * 100) if region_allocation > 0 else 0
-        
-        # Determine color based on percentage
-        if percentage < 50:
-            color = colors.red
-        elif percentage < 100:
-            color = colors.yellow
-        else:
-            color = colors.green
-        
-        # Add row to data with serial number
-        data.append([
-            str(serial_number),
-            regional_bishop,
-            sub_region_names,
-            sub_region_bishop_names,
-            f'{region_allocation:,.2f}',
-            f'{region_contributed:,.2f}',
-            f'{balance:,.2f}',
-            f'{percentage:.1f}%'
-        ])
-        
-        serial_number += 1
-        total_allocation += region_allocation
-        total_contributed += region_contributed
+        for sub_region in sub_regions:
+            # Get sub-region bishop
+            sub_region_bishop = User.query.filter_by(sub_region_id=sub_region.id, role='sub_region_bishop').first()
+            sub_region_bishop_name = sub_region_bishop.full_name if sub_region_bishop else 'N/A'
+            
+            # Calculate allocation for this sub-region
+            sub_region_allocation = db.session.query(db.func.sum(Allocation.amount)).filter(
+                Allocation.level == 'sub_region', Allocation.target_id == sub_region.id).scalar() or 0
+            
+            # Calculate contributed for this sub-region
+            sub_region_church_ids = [c.id for c in Church.query.filter_by(sub_region_id=sub_region.id).all()]
+            sub_region_contributed = 0
+            if sub_region_church_ids:
+                church_allocations = [a.id for a in Allocation.query.filter(
+                    Allocation.level == 'church', Allocation.target_id.in_(sub_region_church_ids)).all()]
+                if church_allocations:
+                    sub_region_contributed = db.session.query(db.func.sum(Payment.amount)).filter(
+                        Payment.allocation_id.in_(church_allocations)).scalar() or 0
+            
+            # Calculate balance and percentage
+            balance = sub_region_allocation - sub_region_contributed
+            percentage = (sub_region_contributed / sub_region_allocation * 100) if sub_region_allocation > 0 else 0
+            
+            # Apply percentage filter if specified
+            if min_percentage is not None and percentage < min_percentage:
+                continue
+            if max_percentage is not None and percentage > max_percentage:
+                continue
+            
+            # Add row to data with serial number
+            data.append([
+                str(serial_number),
+                regional_bishop_name,
+                sub_region.name,
+                sub_region_bishop_name,
+                f'{sub_region_allocation:,.2f}',
+                f'{sub_region_contributed:,.2f}',
+                f'{balance:,.2f}',
+                f'{percentage:.1f}%'
+            ])
+            
+            serial_number += 1
+            total_allocation += sub_region_allocation
+            total_contributed += sub_region_contributed
     
     # Add total row
     total_balance = total_allocation - total_contributed
     total_percentage = (total_contributed / total_allocation * 100) if total_allocation > 0 else 0
-    
-    total_color = colors.red if total_percentage < 50 else (colors.yellow if total_percentage < 100 else colors.green)
     
     data.append([
         '',
@@ -982,8 +991,8 @@ def admin_regions_report():
         f'{total_percentage:.1f}%'
     ])
     
-    # Create table
-    table = Table(data, colWidths=[0.5*inch, 1.5*inch, 1.5*inch, 1.5*inch, 1*inch, 1*inch, 1*inch, 1*inch])
+    # Create table with optimized column widths for landscape
+    table = Table(data, colWidths=[0.4*inch, 1.8*inch, 1.8*inch, 1.8*inch, 1.2*inch, 1.2*inch, 1.2*inch, 1.2*inch])
     
     # Style the table
     table.setStyle(TableStyle([
