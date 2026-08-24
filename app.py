@@ -913,10 +913,11 @@ def admin_regions_report():
     regions = Region.query.all()
     
     # Prepare data for the table
-    data = [['Regional Bishop', 'Sub Regions', 'Sub Region Bishop', 'Allocation', 'Contributed', 'Balance', 'Percentage Achieved']]
+    data = [['S.No', 'Regional Bishop', 'Sub Regions', 'Sub Region Bishop', 'Allocation', 'Contributed', 'Balance', 'Percentage Achieved']]
     
     total_allocation = 0
     total_contributed = 0
+    serial_number = 1
     
     for region in regions:
         regional_bishop = region.admin.full_name if region.admin else 'N/A'
@@ -948,8 +949,9 @@ def admin_regions_report():
         else:
             color = colors.green
         
-        # Add row to data with color indicator
+        # Add row to data with serial number
         data.append([
+            str(serial_number),
             regional_bishop,
             sub_region_names,
             sub_region_bishop_names,
@@ -959,6 +961,7 @@ def admin_regions_report():
             f'{percentage:.1f}%'
         ])
         
+        serial_number += 1
         total_allocation += region_allocation
         total_contributed += region_contributed
     
@@ -969,6 +972,7 @@ def admin_regions_report():
     total_color = colors.red if total_percentage < 50 else (colors.yellow if total_percentage < 100 else colors.green)
     
     data.append([
+        '',
         'TOTAL',
         '',
         '',
@@ -979,7 +983,7 @@ def admin_regions_report():
     ])
     
     # Create table
-    table = Table(data, colWidths=[1.5*inch, 1.5*inch, 1.5*inch, 1*inch, 1*inch, 1*inch, 1*inch])
+    table = Table(data, colWidths=[0.5*inch, 1.5*inch, 1.5*inch, 1.5*inch, 1*inch, 1*inch, 1*inch, 1*inch])
     
     # Style the table
     table.setStyle(TableStyle([
@@ -997,25 +1001,25 @@ def admin_regions_report():
         ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
     ]))
     
-    # Add color coding for percentage column
+    # Add color coding for percentage column (now column index 7)
     for i in range(1, len(data) - 1):  # Skip header and total row
-        percentage_str = data[i][6]
+        percentage_str = data[i][7]
         if percentage_str:
             percentage = float(percentage_str.replace('%', ''))
             if percentage < 50:
-                table.setStyle(TableStyle([('TEXTCOLOR', (6, i), (6, i), colors.red)]))
+                table.setStyle(TableStyle([('TEXTCOLOR', (7, i), (7, i), colors.red)]))
             elif percentage < 100:
-                table.setStyle(TableStyle([('TEXTCOLOR', (6, i), (6, i), colors.yellow)]))
+                table.setStyle(TableStyle([('TEXTCOLOR', (7, i), (7, i), colors.yellow)]))
             else:
-                table.setStyle(TableStyle([('TEXTCOLOR', (6, i), (6, i), colors.green)]))
+                table.setStyle(TableStyle([('TEXTCOLOR', (7, i), (7, i), colors.green)]))
     
     # Color the total row percentage
     if total_percentage < 50:
-        table.setStyle(TableStyle([('TEXTCOLOR', (6, -1), (6, -1), colors.red)]))
+        table.setStyle(TableStyle([('TEXTCOLOR', (7, -1), (7, -1), colors.red)]))
     elif total_percentage < 100:
-        table.setStyle(TableStyle([('TEXTCOLOR', (6, -1), (6, -1), colors.yellow)]))
+        table.setStyle(TableStyle([('TEXTCOLOR', (7, -1), (7, -1), colors.yellow)]))
     else:
-        table.setStyle(TableStyle([('TEXTCOLOR', (6, -1), (6, -1), colors.green)]))
+        table.setStyle(TableStyle([('TEXTCOLOR', (7, -1), (7, -1), colors.green)]))
     
     # Build the PDF
     elements = []
