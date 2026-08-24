@@ -902,10 +902,6 @@ def admin_toggle_user(user_id):
 @login_required
 @role_required('admin')
 def admin_regions_report():
-    # Get percentage filter from query parameters
-    min_percentage = request.args.get('min_percentage', type=float)
-    max_percentage = request.args.get('max_percentage', type=float)
-    
     # Generate PDF report
     from io import BytesIO
     
@@ -916,12 +912,8 @@ def admin_regions_report():
     # Get all regions with their data
     regions = Region.query.all()
     
-    # Prepare data for the table
-    data = [['S.No', 'Regional Bishop', 'Sub Region', 'Sub Region Bishop', 'Allocation', 'Contributed', 'Balance', 'Percentage Achieved']]
-    
-    total_allocation = 0
-    total_contributed = 0
-    serial_number = 1
+    # Collect all sub-region data first for sorting
+    sub_region_data = []
     
     for region in regions:
         # Get regional bishop full name
@@ -954,27 +946,43 @@ def admin_regions_report():
             balance = sub_region_allocation - sub_region_contributed
             percentage = (sub_region_contributed / sub_region_allocation * 100) if sub_region_allocation > 0 else 0
             
-            # Apply percentage filter if specified
-            if min_percentage is not None and percentage < min_percentage:
-                continue
-            if max_percentage is not None and percentage > max_percentage:
-                continue
-            
-            # Add row to data with serial number
-            data.append([
-                str(serial_number),
-                regional_bishop_name,
-                sub_region.name,
-                sub_region_bishop_name,
-                f'{sub_region_allocation:,.2f}',
-                f'{sub_region_contributed:,.2f}',
-                f'{balance:,.2f}',
-                f'{percentage:.1f}%'
-            ])
-            
-            serial_number += 1
-            total_allocation += sub_region_allocation
-            total_contributed += sub_region_contributed
+            # Store data for sorting
+            sub_region_data.append({
+                'regional_bishop': regional_bishop_name,
+                'sub_region_name': sub_region.name,
+                'sub_region_bishop': sub_region_bishop_name,
+                'allocation': sub_region_allocation,
+                'contributed': sub_region_contributed,
+                'balance': balance,
+                'percentage': percentage
+            })
+    
+    # Sort by percentage from highest to lowest
+    sub_region_data.sort(key=lambda x: x['percentage'], reverse=True)
+    
+    # Prepare data for the table
+    data = [['S.No', 'Regional Bishop', 'Sub Region', 'Sub Region Bishop', 'Allocation', 'Contributed', 'Balance', 'Percentage Achieved']]
+    
+    total_allocation = 0
+    total_contributed = 0
+    serial_number = 1
+    
+    for item in sub_region_data:
+        # Add row to data with serial number
+        data.append([
+            str(serial_number),
+            item['regional_bishop'],
+            item['sub_region_name'],
+            item['sub_region_bishop'],
+            f'{item["allocation"]:,.2f}',
+            f'{item["contributed"]:,.2f}',
+            f'{item["balance"]:,.2f}',
+            f'{item["percentage"]:.1f}%'
+        ])
+        
+        serial_number += 1
+        total_allocation += item['allocation']
+        total_contributed += item['contributed']
     
     # Add total row
     total_balance = total_allocation - total_contributed
