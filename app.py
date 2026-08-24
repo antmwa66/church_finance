@@ -57,6 +57,8 @@ class User(db.Model):
     is_active = db.Column(db.Boolean, default=True)
     reset_token = db.Column(db.String(120), unique=True, nullable=True)
     reset_token_expiry = db.Column(db.DateTime, nullable=True)
+    api_token = db.Column(db.String(120), unique=True, nullable=True)
+    api_token_expiry = db.Column(db.DateTime, nullable=True)
 
     region = db.relationship('Region', backref='users', lazy=True, foreign_keys=[region_id])
     sub_region = db.relationship('SubRegion', backref='users', lazy=True, foreign_keys=[sub_region_id])
@@ -396,6 +398,10 @@ def migrate_db():
                 conn.execute(text('ALTER TABLE sub_region ADD COLUMN is_active BOOLEAN DEFAULT TRUE'))
             if 'is_active' not in church_cols:
                 conn.execute(text('ALTER TABLE church ADD COLUMN is_active BOOLEAN DEFAULT TRUE'))
+            if 'api_token' not in user_cols:
+                conn.execute(text('ALTER TABLE "user" ADD COLUMN api_token VARCHAR(120)'))
+            if 'api_token_expiry' not in user_cols:
+                conn.execute(text('ALTER TABLE "user" ADD COLUMN api_token_expiry DATETIME'))
 
 
 @app.route('/api/parse-mpesa-message', methods=['POST'])
@@ -407,6 +413,555 @@ def api_parse_mpesa_message():
     parsed = parse_mpesa_message(message)
     print(f"API parsed result: {parsed}")  # Debug logging
     return jsonify(parsed)
+
+
+def api_auth_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        token = request.headers.get('Authorization', '').replace('Bearer ', '').strip()
+        if not token:
+            return jsonify({'error': 'Authorization token required'}), 401
+        user = User.query.filter_by(api_token=token).first()
+        if not user or not user.api_token_expiry or user.api_token_expiry < datetime.utcnow() or not user.is_active:
+            return jsonify({'error': 'Invalid or expired token'}), 401
+        request.current_user = user
+        return f(*args, **kwargs)
+    return decorated_function
+
+
+@app.route('/api/login', methods=['POST'])
+def api_login():
+    data = request.get_json(silent=True) or {}
+    username = data.get('username', '').strip()
+    password = data.get('password', '')
+    user = User.query.filter_by(username=username).first()
+    if user and check_password_hash(user.password_hash, password) and user.is_active:
+        token = secrets.token_urlsafe(32)
+        user.api_token = token
+        user.api_token_expiry = datetime.utcnow() + timedelta(days=30)
+        db.session.commit()
+        return jsonify({
+            'token': token,
+            'user': {
+                'id': user.id,
+                'username': user.username,
+                'full_name': user.full_name,
+                'role': user.role,
+                'email': user.email,
+                'phone': user.phone,
+                'region_id': user.region_id,
+                'sub_region_id': user.sub_region_id,
+                'church_id': user.church_id,
+            }
+        })
+    return jsonify({'error': 'Invalid username or password'}), 401
+
+
+@app.route('/api/logout', methods=['POST'])
+@api_auth_required
+def api_logout():
+    user = request.current_user
+    user.api_token = None
+    user.api_token_expiry = None
+    db.session.commit()
+    return jsonify({'message': 'Logged out successfully'})
+
+
+@app.route('/api/me')
+@api_auth_required
+def api_me():
+    user = request.current_user
+    region = Region.query.get(user.region_id) if user.region_id else None
+    sub_region = SubRegion.query.get(user.sub_region_id) if user.sub_region_id else None
+    church = Church.query.get(user.church_id) if user.church_id else None
+    return jsonify({
+        'id': user.id,
+        'username': user.username,
+        'full_name': user.full_name,
+        'role': user.role,
+        'email': user.email,
+        'phone': user.phone,
+        'region_id': user.region_id,
+        'region_name': region.name if region else None,
+        'sub_region_id': user.sub_region_id,
+        'sub_region_name': sub_region.name if sub_region else None,
+        'church_id': user.church_id,
+        'church_name': church.name if church else None,
+        'is_active': user.is_active,
+    })
+
+
+@app.route('/api/dashboard')
+@api_auth_required
+def api_dashboard():
+    user = request.current_user
+    role = user.role
+    payload = {'role': role}
+
+    if role == 'admin':
+        payload['stats'] = {
+            'regions': Region.query.count(),
+            'regional_bishops': User.query.filter_by(role='regional_bishop').count(),
+            'sub_region_bishops': User.query.filter_by(role='sub_region_bishop').count(),
+            'local_pastors': User.query.filter_by(role='local_pastor').count(),
+            'payments': Payment.query.count(),
+            'total_amount': float(db.session.query(db.func.sum(Payment.amount)).scalar() or 0),
+        }
+    elif role == 'regional_bishop':
+        region = Region.query.get(user.region_id) if user.region_id else None
+        sub_regions = SubRegion.query.filter_by(region_id=user.region_id).all() if user.region_id else []
+        sub_bishops = User.query.filter_by(role='sub_region_bishop', region_id=user.region_id).all()
+        pastors = User.query.filter_by(role='local_pastor').join(Church).join(SubRegion).filter(
+            SubRegion.region_id == user.region_id
+        ).all()
+        total_payments = Payment.query.join(Church).join(SubRegion).filter(
+            SubRegion.region_id == user.region_id
+        ).count()
+        total_amount = float(db.session.query(db.func.sum(Payment.amount)).join(Church).join(SubRegion).filter(
+            SubRegion.region_id == user.region_id
+        ).scalar() or 0)
+        payload['stats'] = {
+            'region_name': region.name if region else None,
+            'sub_regions': len(sub_regions),
+            'sub_bishops': len(sub_bishops),
+            'pastors': len(pastors),
+            'payments': total_payments,
+            'total_amount': total_amount,
+        }
+    elif role == 'sub_region_bishop':
+        sub_region = SubRegion.query.get(user.sub_region_id) if user.sub_region_id else None
+        churches = Church.query.filter_by(sub_region_id=user.sub_region_id).all() if user.sub_region_id else []
+        pastors = User.query.filter_by(role='local_pastor', sub_region_id=user.sub_region_id).all()
+        total_payments = Payment.query.filter(Payment.pastor_id.in_([p.id for p in pastors])).count() if pastors else 0
+        total_amount = float(db.session.query(db.func.sum(Payment.amount)).filter(
+            Payment.pastor_id.in_([p.id for p in pastors])
+        ).scalar() or 0)
+        payload['stats'] = {
+            'sub_region_name': sub_region.name if sub_region else None,
+            'churches': len(churches),
+            'pastors': len(pastors),
+            'payments': total_payments,
+            'total_amount': total_amount,
+        }
+    elif role == 'local_pastor':
+        church = Church.query.get(user.church_id) if user.church_id else None
+        sub_region = SubRegion.query.get(church.sub_region_id) if church and church.sub_region_id else None
+        region = Region.query.get(sub_region.region_id) if sub_region and sub_region.region_id else None
+        my_payments = Payment.query.filter_by(pastor_id=user.id).all()
+        my_total = float(db.session.query(db.func.sum(Payment.amount)).filter_by(pastor_id=user.id).scalar() or 0)
+        payload['stats'] = {
+            'church_name': church.name if church else None,
+            'sub_region_name': sub_region.name if sub_region else None,
+            'region_name': region.name if region else None,
+            'my_payments': len(my_payments),
+            'my_total': my_total,
+        }
+
+    return jsonify(payload)
+
+
+@app.route('/api/sub_regions')
+@api_auth_required
+def api_sub_regions():
+    user = request.current_user
+    role = user.role
+    if role == 'regional_bishop':
+        sub_regions = SubRegion.query.filter_by(region_id=user.region_id).all()
+    elif role == 'sub_region_bishop':
+        sub_regions = SubRegion.query.filter_by(id=user.sub_region_id).all()
+    else:
+        sub_regions = []
+    return jsonify([{'id': sr.id, 'name': sr.name, 'region_id': sr.region_id, 'is_active': sr.is_active} for sr in sub_regions])
+
+
+@app.route('/api/sub_regions', methods=['POST'])
+@api_auth_required
+def api_create_sub_region():
+    user = request.current_user
+    if user.role not in ['regional_bishop', 'admin']:
+        return jsonify({'error': 'Forbidden'}), 403
+    data = request.get_json(silent=True) or {}
+    name = data.get('name', '').strip()
+    region_id = data.get('region_id', user.region_id)
+    if not name:
+        return jsonify({'error': 'Name is required'}), 400
+    sub_region = SubRegion(name=name, region_id=region_id)
+    db.session.add(sub_region)
+    db.session.commit()
+    return jsonify({'id': sub_region.id, 'name': sub_region.name, 'region_id': sub_region.region_id}), 201
+
+
+@app.route('/api/sub_regions/<int:subregion_id>', methods=['PUT'])
+@api_auth_required
+def api_update_sub_region(subregion_id):
+    user = request.current_user
+    sub_region = SubRegion.query.get_or_404(subregion_id)
+    if user.role == 'regional_bishop' and sub_region.region_id != user.region_id:
+        return jsonify({'error': 'Forbidden'}), 403
+    data = request.get_json(silent=True) or {}
+    name = data.get('name', '').strip()
+    if name:
+        sub_region.name = name
+    if 'is_active' in data and user.role in ['admin', 'regional_bishop']:
+        sub_region.is_active = bool(data['is_active'])
+    db.session.commit()
+    return jsonify({'id': sub_region.id, 'name': sub_region.name, 'is_active': sub_region.is_active})
+
+
+@app.route('/api/sub_regions/<int:subregion_id>', methods=['DELETE'])
+@api_auth_required
+def api_delete_sub_region(subregion_id):
+    user = request.current_user
+    sub_region = SubRegion.query.get_or_404(subregion_id)
+    if user.role == 'regional_bishop' and sub_region.region_id != user.region_id:
+        return jsonify({'error': 'Forbidden'}), 403
+    db.session.delete(sub_region)
+    db.session.commit()
+    return jsonify({'message': 'Deleted'})
+
+
+@app.route('/api/churches')
+@api_auth_required
+def api_churches():
+    user = request.current_user
+    role = user.role
+    if role == 'regional_bishop':
+        churches = Church.query.join(SubRegion).filter(SubRegion.region_id == user.region_id).all()
+    elif role == 'sub_region_bishop':
+        churches = Church.query.filter_by(sub_region_id=user.sub_region_id).all()
+    elif role == 'local_pastor':
+        churches = Church.query.filter_by(id=user.church_id).all()
+    else:
+        churches = []
+    return jsonify([{'id': c.id, 'name': c.name, 'sub_region_id': c.sub_region_id, 'is_active': c.is_active} for c in churches])
+
+
+@app.route('/api/churches', methods=['POST'])
+@api_auth_required
+def api_create_church():
+    user = request.current_user
+    if user.role not in ['sub_region_bishop', 'admin', 'regional_bishop']:
+        return jsonify({'error': 'Forbidden'}), 403
+    data = request.get_json(silent=True) or {}
+    name = data.get('name', '').strip()
+    sub_region_id = data.get('sub_region_id', user.sub_region_id)
+    if not name or not sub_region_id:
+        return jsonify({'error': 'Name and sub_region_id are required'}), 400
+    church = Church(name=name, sub_region_id=sub_region_id)
+    db.session.add(church)
+    db.session.commit()
+    return jsonify({'id': church.id, 'name': church.name, 'sub_region_id': church.sub_region_id}), 201
+
+
+@app.route('/api/churches/<int:church_id>', methods=['PUT'])
+@api_auth_required
+def api_update_church(church_id):
+    user = request.current_user
+    church = Church.query.get_or_404(church_id)
+    if user.role == 'sub_region_bishop' and church.sub_region_id != user.sub_region_id:
+        return jsonify({'error': 'Forbidden'}), 403
+    if user.role == 'regional_bishop':
+        sub_region = SubRegion.query.get(church.sub_region_id)
+        if not sub_region or sub_region.region_id != user.region_id:
+            return jsonify({'error': 'Forbidden'}), 403
+    data = request.get_json(silent=True) or {}
+    name = data.get('name', '').strip()
+    if name:
+        church.name = name
+    if 'is_active' in data and user.role in ['admin', 'regional_bishop', 'sub_region_bishop']:
+        church.is_active = bool(data['is_active'])
+    db.session.commit()
+    return jsonify({'id': church.id, 'name': church.name, 'is_active': church.is_active})
+
+
+@app.route('/api/churches/<int:church_id>', methods=['DELETE'])
+@api_auth_required
+def api_delete_church(church_id):
+    user = request.current_user
+    church = Church.query.get_or_404(church_id)
+    if user.role == 'sub_region_bishop' and church.sub_region_id != user.sub_region_id:
+        return jsonify({'error': 'Forbidden'}), 403
+    if user.role == 'regional_bishop':
+        sub_region = SubRegion.query.get(church.sub_region_id)
+        if not sub_region or sub_region.region_id != user.region_id:
+            return jsonify({'error': 'Forbidden'}), 403
+    db.session.delete(church)
+    db.session.commit()
+    return jsonify({'message': 'Deleted'})
+
+
+@app.route('/api/pastors')
+@api_auth_required
+def api_pastors():
+    user = request.current_user
+    role = user.role
+    if role == 'regional_bishop':
+        pastors = User.query.filter_by(role='local_pastor').join(Church).join(SubRegion).filter(
+            SubRegion.region_id == user.region_id
+        ).all()
+    elif role == 'sub_region_bishop':
+        pastors = User.query.filter_by(role='local_pastor', sub_region_id=user.sub_region_id).all()
+    elif role == 'local_pastor':
+        pastors = User.query.filter_by(id=user.id).all()
+    else:
+        pastors = []
+    return jsonify([{
+        'id': p.id,
+        'full_name': p.full_name,
+        'email': p.email,
+        'phone': p.phone,
+        'church_id': p.church_id,
+        'church_name': p.church.name if p.church else None,
+        'sub_region_id': p.sub_region_id,
+        'is_active': p.is_active,
+    } for p in pastors])
+
+
+@app.route('/api/pastors', methods=['POST'])
+@api_auth_required
+def api_create_pastor():
+    user = request.current_user
+    if user.role not in ['sub_region_bishop', 'admin', 'regional_bishop']:
+        return jsonify({'error': 'Forbidden'}), 403
+    data = request.get_json(silent=True) or {}
+    full_name = data.get('full_name', '').strip()
+    email = data.get('email', '').strip()
+    phone = data.get('phone', '').strip()
+    username = data.get('username', '').strip()
+    password = data.get('password', '')
+    church_id = data.get('church_id')
+    sub_region_id = data.get('sub_region_id', user.sub_region_id)
+    region_id = data.get('region_id', user.region_id)
+    if not all([full_name, username, password, church_id]):
+        return jsonify({'error': 'full_name, username, password and church_id are required'}), 400
+    existing = User.query.filter_by(username=username).first()
+    if existing:
+        return jsonify({'error': 'Username already exists'}), 400
+    pastor = User(
+        username=username,
+        password_hash=generate_password_hash(password),
+        role='local_pastor',
+        full_name=full_name,
+        email=email,
+        phone=phone,
+        region_id=region_id,
+        sub_region_id=sub_region_id,
+        church_id=church_id,
+        created_by_id=user.id,
+    )
+    db.session.add(pastor)
+    db.session.commit()
+    return jsonify({'id': pastor.id, 'full_name': pastor.full_name, 'username': pastor.username}), 201
+
+
+@app.route('/api/pastors/<int:pastor_id>', methods=['PUT'])
+@api_auth_required
+def api_update_pastor(pastor_id):
+    user = request.current_user
+    pastor = User.query.get_or_404(pastor_id)
+    if pastor.role != 'local_pastor':
+        return jsonify({'error': 'Not a pastor'}), 400
+    if user.role == 'sub_region_bishop' and pastor.sub_region_id != user.sub_region_id:
+        return jsonify({'error': 'Forbidden'}), 403
+    if user.role == 'regional_bishop':
+        sub_region = SubRegion.query.get(pastor.sub_region_id)
+        if not sub_region or sub_region.region_id != user.region_id:
+            return jsonify({'error': 'Forbidden'}), 403
+    data = request.get_json(silent=True) or {}
+    pastor.full_name = data.get('full_name', pastor.full_name).strip()
+    pastor.email = data.get('email', pastor.email).strip()
+    pastor.phone = data.get('phone', pastor.phone).strip()
+    if 'church_id' in data:
+        pastor.church_id = data['church_id']
+    if 'is_active' in data and user.role in ['admin', 'regional_bishop', 'sub_region_bishop']:
+        pastor.is_active = bool(data['is_active'])
+    db.session.commit()
+    return jsonify({'id': pastor.id, 'full_name': pastor.full_name, 'email': pastor.email, 'phone': pastor.phone, 'church_id': pastor.church_id, 'is_active': pastor.is_active})
+
+
+@app.route('/api/pastors/<int:pastor_id>', methods=['DELETE'])
+@api_auth_required
+def api_delete_pastor(pastor_id):
+    user = request.current_user
+    pastor = User.query.get_or_404(pastor_id)
+    if pastor.role != 'local_pastor':
+        return jsonify({'error': 'Not a pastor'}), 400
+    if user.role == 'sub_region_bishop' and pastor.sub_region_id != user.sub_region_id:
+        return jsonify({'error': 'Forbidden'}), 403
+    if user.role == 'regional_bishop':
+        sub_region = SubRegion.query.get(pastor.sub_region_id)
+        if not sub_region or sub_region.region_id != user.region_id:
+            return jsonify({'error': 'Forbidden'}), 403
+    db.session.delete(pastor)
+    db.session.commit()
+    return jsonify({'message': 'Deleted'})
+
+
+@app.route('/api/payments', methods=['POST'])
+@api_auth_required
+def api_create_payment():
+    user = request.current_user
+    data = request.get_json(silent=True) or {}
+    church_id = data.get('church_id')
+    category_id = data.get('category_id')
+    amount = data.get('amount')
+    paybill_number = data.get('paybill_number', '').strip()
+    receipt_reference = data.get('receipt_reference', '').strip()
+    payment_date_str = data.get('payment_date')
+    notes = data.get('notes', '').strip()
+    if not all([church_id, category_id, amount, paybill_number, receipt_reference]):
+        return jsonify({'error': 'church_id, category_id, amount, paybill_number and receipt_reference are required'}), 400
+    try:
+        amount_val = float(amount)
+        if amount_val <= 0:
+            raise ValueError
+    except ValueError:
+        return jsonify({'error': 'Amount must be a positive number'}), 400
+    payment_date = date.today()
+    if payment_date_str:
+        try:
+            payment_date = datetime.strptime(payment_date_str, '%Y-%m-%d').date()
+        except ValueError:
+            return jsonify({'error': 'Invalid date format, use YYYY-MM-DD'}), 400
+    payment = Payment(
+        church_id=church_id,
+        pastor_id=user.id,
+        category_id=category_id,
+        amount=amount_val,
+        paybill_number=paybill_number,
+        receipt_reference=receipt_reference,
+        payment_date=payment_date,
+        notes=notes,
+    )
+    db.session.add(payment)
+    db.session.commit()
+    return jsonify({'id': payment.id, 'amount': payment.amount, 'payment_date': payment.payment_date.isoformat()}), 201
+
+
+@app.route('/api/payments')
+@api_auth_required
+def api_payments():
+    user = request.current_user
+    role = user.role
+    query = Payment.query
+    if role == 'regional_bishop':
+        query = query.join(Church).join(SubRegion).filter(SubRegion.region_id == user.region_id)
+    elif role == 'sub_region_bishop':
+        query = query.join(Church).filter(Church.sub_region_id == user.sub_region_id)
+    elif role == 'local_pastor':
+        query = query.filter_by(pastor_id=user.id)
+    payments = query.order_by(Payment.created_at.desc()).all()
+    return jsonify([{
+        'id': p.id,
+        'amount': p.amount,
+        'paybill_number': p.paybill_number,
+        'receipt_reference': p.receipt_reference,
+        'payment_date': p.payment_date.isoformat(),
+        'notes': p.notes,
+        'church_id': p.church_id,
+        'church_name': p.church.name if p.church else None,
+        'category_id': p.category_id,
+        'category_name': p.category.name if p.category else None,
+        'pastor_id': p.pastor_id,
+        'pastor_name': p.pastor.full_name if p.pastor else None,
+    } for p in payments])
+
+
+@app.route('/api/reports/regions')
+@api_auth_required
+def api_reports_regions():
+    user = request.current_user
+    if user.role not in ['admin', 'regional_bishop']:
+        return jsonify({'error': 'Forbidden'}), 403
+    category_id = request.args.get('category_id', type=int)
+    if user.role == 'regional_bishop':
+        regions = Region.query.filter_by(id=user.region_id).all()
+    else:
+        regions = Region.query.all()
+    result = []
+    for region in regions:
+        sub_regions = SubRegion.query.filter_by(region_id=region.id).all()
+        for sub_region in sub_regions:
+            if category_id:
+                allocation = db.session.query(db.func.sum(Allocation.amount)).filter(
+                    Allocation.level == 'sub_region', Allocation.target_id == sub_region.id,
+                    Allocation.category_id == category_id
+                ).scalar() or 0
+                church_ids = [c.id for c in Church.query.filter_by(sub_region_id=sub_region.id).all()]
+                contributed = 0
+                if church_ids:
+                    alloc_ids = [a.id for a in Allocation.query.filter(
+                        Allocation.level == 'church', Allocation.target_id.in_(church_ids),
+                        Allocation.category_id == category_id
+                    ).all()]
+                    if alloc_ids:
+                        contributed = db.session.query(db.func.sum(Payment.amount)).filter(
+                            Payment.allocation_id.in_(alloc_ids), Payment.category_id == category_id
+                        ).scalar() or 0
+            else:
+                allocation = db.session.query(db.func.sum(Allocation.amount)).filter(
+                    Allocation.level == 'sub_region', Allocation.target_id == sub_region.id
+                ).scalar() or 0
+                church_ids = [c.id for c in Church.query.filter_by(sub_region_id=sub_region.id).all()]
+                contributed = 0
+                if church_ids:
+                    alloc_ids = [a.id for a in Allocation.query.filter(
+                        Allocation.level == 'church', Allocation.target_id.in_(church_ids)
+                    ).all()]
+                    if alloc_ids:
+                        contributed = db.session.query(db.func.sum(Payment.amount)).filter(
+                            Payment.allocation_id.in_(alloc_ids)
+                        ).scalar() or 0
+            result.append({
+                'region_name': region.name,
+                'sub_region_name': sub_region.name,
+                'allocation': float(allocation),
+                'contributed': float(contributed),
+                'balance': float(allocation) - float(contributed),
+                'percentage': float(contributed) / float(allocation) * 100 if allocation else 0,
+            })
+    result.sort(key=lambda x: x['percentage'], reverse=True)
+    return jsonify(result)
+
+
+@app.route('/api/categories')
+@api_auth_required
+def api_categories():
+    categories = PaymentCategory.query.order_by(PaymentCategory.name).all()
+    return jsonify([{'id': c.id, 'name': c.name, 'description': c.description, 'is_active': c.is_active} for c in categories])
+
+
+@app.route('/api/profile', methods=['PUT'])
+@api_auth_required
+def api_update_profile():
+    user = request.current_user
+    data = request.get_json(silent=True) or {}
+    user.full_name = data.get('full_name', user.full_name).strip()
+    user.email = data.get('email', user.email).strip()
+    user.phone = data.get('phone', user.phone).strip()
+    db.session.commit()
+    return jsonify({'full_name': user.full_name, 'email': user.email, 'phone': user.phone})
+
+
+@app.route('/api/profile/password', methods=['POST'])
+@api_auth_required
+def api_change_password():
+    user = request.current_user
+    data = request.get_json(silent=True) or {}
+    current_password = data.get('current_password', '')
+    new_password = data.get('new_password', '')
+    confirm_password = data.get('confirm_password', '')
+    if not current_password or not new_password or not confirm_password:
+        return jsonify({'error': 'All fields are required'}), 400
+    if not check_password_hash(user.password_hash, current_password):
+        return jsonify({'error': 'Current password is incorrect'}), 400
+    if new_password != confirm_password:
+        return jsonify({'error': 'New passwords do not match'}), 400
+    if len(new_password) < 6:
+        return jsonify({'error': 'New password must be at least 6 characters'}), 400
+    user.password_hash = generate_password_hash(new_password)
+    db.session.commit()
+    return jsonify({'message': 'Password changed successfully'})
 
 
 @app.route('/')
