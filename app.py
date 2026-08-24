@@ -1005,7 +1005,7 @@ def admin_regions_report():
             if percentage < 50:
                 table.setStyle(TableStyle([('TEXTCOLOR', (6, i), (6, i), colors.red)]))
             elif percentage < 100:
-                table.setStyle(TableStyle([('TEXTCOLOR', (6, i), (6, i), colors.orange)]))
+                table.setStyle(TableStyle([('TEXTCOLOR', (6, i), (6, i), colors.yellow)]))
             else:
                 table.setStyle(TableStyle([('TEXTCOLOR', (6, i), (6, i), colors.green)]))
     
@@ -1013,7 +1013,7 @@ def admin_regions_report():
     if total_percentage < 50:
         table.setStyle(TableStyle([('TEXTCOLOR', (6, -1), (6, -1), colors.red)]))
     elif total_percentage < 100:
-        table.setStyle(TableStyle([('TEXTCOLOR', (6, -1), (6, -1), colors.orange)]))
+        table.setStyle(TableStyle([('TEXTCOLOR', (6, -1), (6, -1), colors.yellow)]))
     else:
         table.setStyle(TableStyle([('TEXTCOLOR', (6, -1), (6, -1), colors.green)]))
     
