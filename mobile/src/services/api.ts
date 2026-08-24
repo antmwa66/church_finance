@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const DEV_API_URL = 'YOUR_DEV_IP_HERE';
-const API_BASE_URL = __DEV__ ? `http://${DEV_API_URL}:5000` : 'https://your-domain.com';
+const DEV_API_URL = '10.88.51.20';
+const API_BASE_URL = __DEV__ ? `http://${DEV_API_URL}:5000` : '10.88.51.20';
 
 export interface Category {
   id: number;
@@ -191,9 +191,28 @@ export const api = {
   },
 
   async changePassword(token: string, current: string, newPass: string) {
-    return request('/api/profile/password', {
+    const res = await request('/api/profile/password', {
       method: 'POST',
       body: JSON.stringify({ current_password: current, new_password: newPass, confirm_password: newPass }),
+    }, token);
+    return res;
+  },
+
+  async getAuditPayments(token: string) {
+    return request('/api/audit/payments', {}, token);
+  },
+
+  async verifyBankMessage(token: string, message: string) {
+    return request('/api/audit/verify', {
+      method: 'POST',
+      body: JSON.stringify({ message }),
+    }, token);
+  },
+
+  async updateAuditStatus(token: string, paymentId: number, status: string, notes?: string) {
+    return request(`/api/audit/payments/${paymentId}/status`, {
+      method: 'POST',
+      body: JSON.stringify({ audit_status: status, audit_notes: notes }),
     }, token);
   },
 };

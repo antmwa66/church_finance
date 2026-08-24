@@ -15,11 +15,14 @@ import PastorsScreen from '../src/screens/PastorsScreen';
 import CreatePastorScreen from '../src/screens/CreatePastorScreen';
 import ReportsScreen from '../src/screens/ReportsScreen';
 import ProfileScreen from '../src/screens/ProfileScreen';
+import AuditScreen from '../src/screens/AuditScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
 function MainTabs() {
+  const { user } = useAuth();
+  const role = user?.role;
   return (
     <Tab.Navigator screenOptions={({ route }) => ({
       tabBarIcon: ({ color, size }: { color: string; size: number }) => {
@@ -29,6 +32,7 @@ function MainTabs() {
         else if (route.name === 'Churches') icon = 'business';
         else if (route.name === 'Pastors') icon = 'people';
         else if (route.name === 'Reports') icon = 'bar-chart';
+        else if (route.name === 'Audit') icon = 'search';
         else if (route.name === 'Profile') icon = 'person';
         return <Ionicons name={icon} size={size} color={color} />;
       },
@@ -40,6 +44,9 @@ function MainTabs() {
       <Tab.Screen name="Churches" component={ChurchesScreen} />
       <Tab.Screen name="Pastors" component={PastorsScreen} />
       <Tab.Screen name="Reports" component={ReportsScreen} />
+      {(role === 'admin' || role === 'regional_bishop') && (
+        <Tab.Screen name="Audit" component={AuditScreen} />
+      )}
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
   );

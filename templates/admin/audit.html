@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% block title %}Transaction Audit - Church Finance{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Transaction Audit</h1>
+    <p>Verify payments against bank/M-PESA messages</p>
+</div>
+
+<div class="summary-bar">
+    <span>Pending: {{ stats.pending }}</span>
+    <span>Matched: {{ stats.matched }}</span>
+    <span>Mismatch: {{ stats.mismatch }}</span>
+    <span>Verified: {{ stats.verified }}</span>
+</div>
+
+<div class="form-container" style="margin-bottom: 24px;">
+    <h2>Verify Bank Message</h2>
+    <form method="POST" action="{{ url_for('admin_audit_verify') }}">
+        <div class="form-group">
+            <label for="message">Paste Bank / M-PESA Message</label>
+            <textarea id="message" name="message" rows="4" required placeholder="e.g. Ksh 1,000.00 from JOHN DOE - 2547****** account 131***4378 on 24/8/2026 at 10:15 AM via M-PESA ref ABC123XYZ"></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary">Verify Message</button>
+    </form>
+</div>
+
+{% if result %}
+<div class="form-container" style="margin-bottom: 24px;">
+    <h2>Verification Result</h2>
+    <p><strong>Parsed Amount:</strong> {{ result.parsed.amount }}</p>
+    <p><strong>Parsed Paybill:</strong> {{ result.parsed.paybill_number }}</p>
+    <p><strong>Parsed Date:</strong> {{ result.parsed.payment_date }}</p>
+    <p><strong>Parsed Ref:</strong> {{ result.parsed.transaction_code }}</p>
+
+    {% if result.matches %}
+    <h3 style="color: green;">Exact Matches</h3>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr><th>ID</th><th>Amount</th><th>Receipt Ref</th><th>Date</th><th>Church</th><th>Pastor</th></tr>
+            </thead>
+            <tbody>
+                {% for m in result.matches %}
+                <tr>
+                    <td>{{ m.id }}</td>
+                    <td>KES {{ "%.2f"|format(m.amount) }}</td>
+                    <td>{{ m.receipt_reference }}</td>
+                    <td>{{ m.payment_date }}</td>
+                    <td>{{ m.church_name }}</td>
+                    <td>{{ m.pastor_name }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    {% if result.potential_matches %}
+    <h3 style="color: orange;">Potential Matches (same amount/paybill/date, different ref)</h3>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr><th>ID</th><th>Amount</th><th>Receipt Ref</th><th>Date</th><th>Church</th><th>Pastor</th></tr>
+            </thead>
+            <tbody>
+                {% for m in result.potential_matches %}
+                <tr>
+                    <td>{{ m.id }}</td>
+                    <td>KES {{ "%.2f"|format(m.amount) }}</td>
+                    <td>{{ m.receipt_reference }}</td>
+                    <td>{{ m.payment_date }}</td>
+                    <td>{{ m.church_name }}</td>
+                    <td>{{ m.pastor_name }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    {% if result.mismatches %}
+    <h3 style="color: red;">Other Candidates</h3>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr><th>ID</th><th>Amount</th><th>Receipt Ref</th><th>Date</th><th>Church</th><th>Pastor</th></tr>
+            </thead>
+            <tbody>
+                {% for m in result.mismatches %}
+                <tr>
+                    <td>{{ m.id }}</td>
+                    <td>KES {{ "%.2f"|format(m.amount) }}</td>
+                    <td>{{ m.receipt_reference }}</td>
+                    <td>{{ m.payment_date }}</td>
+                    <td>{{ m.church_name }}</td>
+                    <td>{{ m.pastor_name }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    {% if not result.matches and not result.potential_matches and not result.mismatches %}
+    <p>No matching payments found.</p>
+    {% endif %}
+</div>
+{% endif %}
+
+<h2>All Payments Audit Status</h2>
+<div class="table-container">
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Date</th>
+                <th>Church</th>
+                <th>Pastor</th>
+                <th>Amount</th>
+                <th>Receipt Ref</th>
+                <th>Audit Status</th>
+                <th>Audit Notes</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in payments %}
+            <tr>
+                <td>{{ p.id }}</td>
+                <td>{{ p.payment_date.strftime('%Y-%m-%d') }}</td>
+                <td>{{ p.church.name }}</td>
+                <td>{{ p.pastor.full_name }}</td>
+                <td class="amount">KES {{ "%.2f"|format(p.amount) }}</td>
+                <td>{{ p.receipt_reference }}</td>
+                <td>{{ p.audit_status or 'pending' }}</td>
+                <td>{{ p.audit_notes or '-' }}</td>
+                <td>
+                    <form method="POST" action="{{ url_for('admin_audit_update_status', payment_id=p.id) }}" style="display:inline;">
+                        <select name="audit_status" onchange="this.form.submit()">
+                            <option value="">Set Status</option>
+                            <option value="matched">Matched</option>
+                            <option value="mismatch">Mismatch</option>
+                            <option value="verified">Verified</option>
+                            <option value="pending">Pending</option>
+                        </select>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+<a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary">Back to Dashboard</a>
+{% endblock %}

@@ -109,6 +109,8 @@ class Payment(db.Model):
     notes = db.Column(db.Text)
     allocation_id = db.Column(db.Integer, db.ForeignKey('allocation.id'), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    audit_status = db.Column(db.String(20), default='pending')
+    audit_notes = db.Column(db.Text)
 
     category = db.relationship('PaymentCategory', backref='payments', lazy=True)
     allocation = db.relationship('Allocation', backref='payments', lazy=True)
@@ -402,6 +404,10 @@ def migrate_db():
                 conn.execute(text('ALTER TABLE "user" ADD COLUMN api_token VARCHAR(120)'))
             if 'api_token_expiry' not in user_cols:
                 conn.execute(text('ALTER TABLE "user" ADD COLUMN api_token_expiry DATETIME'))
+            if 'audit_status' not in payment_cols:
+                conn.execute(text('ALTER TABLE payment ADD COLUMN audit_status VARCHAR(20) DEFAULT "pending"'))
+            if 'audit_notes' not in payment_cols:
+                conn.execute(text('ALTER TABLE payment ADD COLUMN audit_notes TEXT'))
 
 
 @app.route('/api/parse-mpesa-message', methods=['POST'])
@@ -964,6 +970,223 @@ def api_change_password():
     return jsonify({'message': 'Password changed successfully'})
 
 
+@app.route('/api/admin/audit/payments')
+@api_auth_required
+def api_admin_audit_payments():
+    user = request.current_user
+    if user.role != 'admin':
+        return jsonify({'error': 'Forbidden'}), 403
+    payments = Payment.query.order_by(Payment.created_at.desc()).all()
+    return jsonify([{
+        'id': p.id,
+        'amount': p.amount,
+        'paybill_number': p.paybill_number,
+        'receipt_reference': p.receipt_reference,
+        'payment_date': p.payment_date.isoformat(),
+        'notes': p.notes,
+        'audit_status': p.audit_status,
+        'audit_notes': p.audit_notes,
+        'church_id': p.church_id,
+        'church_name': p.church.name if p.church else None,
+        'category_id': p.category_id,
+        'category_name': p.category.name if p.category else None,
+        'pastor_id': p.pastor_id,
+        'pastor_name': p.pastor.full_name if p.pastor else None,
+        'created_at': p.created_at.isoformat(),
+    } for p in payments])
+
+
+@app.route('/api/admin/audit/verify', methods=['POST'])
+@api_auth_required
+def api_admin_audit_verify():
+    user = request.current_user
+    if user.role != 'admin':
+        return jsonify({'error': 'Forbidden'}), 403
+    data = request.get_json(silent=True) or {}
+    message = data.get('message', '').strip()
+    if not message:
+        return jsonify({'error': 'Bank message is required'}), 400
+
+    parsed = parse_mpesa_message(message)
+    matches = []
+    mismatches = []
+    potential = []
+
+    query = Payment.query
+    if parsed['amount'] is not None:
+        query = query.filter(Payment.amount == parsed['amount'])
+    if parsed['paybill_number']:
+        query = query.filter(Payment.paybill_number == parsed['paybill_number'])
+    if parsed['payment_date']:
+        try:
+            msg_date = datetime.strptime(parsed['payment_date'], '%Y-%m-%d').date()
+            query = query.filter(Payment.payment_date == msg_date)
+        except ValueError:
+            pass
+
+    candidates = query.order_by(Payment.created_at.desc()).all()
+
+    for p in candidates:
+        record = {
+            'id': p.id,
+            'amount': p.amount,
+            'paybill_number': p.paybill_number,
+            'receipt_reference': p.receipt_reference,
+            'payment_date': p.payment_date.isoformat(),
+            'audit_status': p.audit_status,
+            'church_name': p.church.name if p.church else None,
+            'category_name': p.category.name if p.category else None,
+            'pastor_name': p.pastor.full_name if p.pastor else None,
+        }
+        if parsed['receipt_reference'] and p.receipt_reference:
+            if parsed['receipt_reference'].upper() == p.receipt_reference.upper():
+                matches.append(record)
+                continue
+        if parsed['amount'] is not None and parsed['paybill_number'] and parsed['payment_date']:
+            potential.append(record)
+        else:
+            mismatches.append(record)
+
+    return jsonify({
+        'parsed': parsed,
+        'matches': matches,
+        'potential_matches': potential,
+        'mismatches': mismatches,
+        'total_candidates': len(candidates),
+    })
+
+
+@app.route('/api/admin/audit/payments/<int:payment_id>/status', methods=['POST'])
+@api_auth_required
+def api_admin_audit_update_status(payment_id):
+    user = request.current_user
+    if user.role != 'admin':
+        return jsonify({'error': 'Forbidden'}), 403
+    payment = Payment.query.get_or_404(payment_id)
+    data = request.get_json(silent=True) or {}
+    status = data.get('audit_status')
+    notes = data.get('audit_notes', '')
+    if status not in ['pending', 'matched', 'mismatch', 'verified']:
+        return jsonify({'error': 'Invalid audit status'}), 400
+    payment.audit_status = status
+    payment.audit_notes = notes
+    db.session.commit()
+    return jsonify({'id': payment.id, 'audit_status': payment.audit_status, 'audit_notes': payment.audit_notes})
+
+
+@app.route('/api/audit/payments')
+@api_auth_required
+def api_audit_payments():
+    user = request.current_user
+    if user.role not in ['admin', 'regional_bishop']:
+        return jsonify({'error': 'Forbidden'}), 403
+    query = Payment.query
+    if user.role == 'regional_bishop':
+        query = query.join(Church).join(SubRegion).filter(SubRegion.region_id == user.region_id)
+    payments = query.order_by(Payment.created_at.desc()).all()
+    return jsonify([{
+        'id': p.id,
+        'amount': p.amount,
+        'paybill_number': p.paybill_number,
+        'receipt_reference': p.receipt_reference,
+        'payment_date': p.payment_date.isoformat(),
+        'notes': p.notes,
+        'audit_status': p.audit_status,
+        'audit_notes': p.audit_notes,
+        'church_id': p.church_id,
+        'church_name': p.church.name if p.church else None,
+        'category_id': p.category_id,
+        'category_name': p.category.name if p.category else None,
+        'pastor_id': p.pastor_id,
+        'pastor_name': p.pastor.full_name if p.pastor else None,
+    } for p in payments])
+
+
+@app.route('/api/audit/verify', methods=['POST'])
+@api_auth_required
+def api_audit_verify():
+    user = request.current_user
+    if user.role not in ['admin', 'regional_bishop']:
+        return jsonify({'error': 'Forbidden'}), 403
+    data = request.get_json(silent=True) or {}
+    message = data.get('message', '').strip()
+    if not message:
+        return jsonify({'error': 'Bank message is required'}), 400
+    parsed = parse_mpesa_message(message)
+    matches = []
+    mismatches = []
+    potential = []
+
+    query = Payment.query
+    if user.role == 'regional_bishop':
+        query = query.join(Church).join(SubRegion).filter(SubRegion.region_id == user.region_id)
+    if parsed['amount'] is not None:
+        query = query.filter(Payment.amount == parsed['amount'])
+    if parsed['paybill_number']:
+        query = query.filter(Payment.paybill_number == parsed['paybill_number'])
+    if parsed['payment_date']:
+        try:
+            msg_date = datetime.strptime(parsed['payment_date'], '%Y-%m-%d').date()
+            query = query.filter(Payment.payment_date == msg_date)
+        except ValueError:
+            pass
+
+    candidates = query.order_by(Payment.created_at.desc()).all()
+    for p in candidates:
+        record = {
+            'id': p.id,
+            'amount': p.amount,
+            'paybill_number': p.paybill_number,
+            'receipt_reference': p.receipt_reference,
+            'payment_date': p.payment_date.isoformat(),
+            'audit_status': p.audit_status,
+            'church_name': p.church.name if p.church else None,
+            'category_name': p.category.name if p.category else None,
+            'pastor_name': p.pastor.full_name if p.pastor else None,
+        }
+        if parsed['transaction_code'] and p.receipt_reference:
+            if parsed['transaction_code'].upper() == p.receipt_reference.upper():
+                matches.append(record)
+                continue
+        if parsed['amount'] is not None and parsed['paybill_number'] and parsed['payment_date']:
+            potential.append(record)
+        else:
+            mismatches.append(record)
+
+    return jsonify({
+        'parsed': parsed,
+        'matches': matches,
+        'potential_matches': potential,
+        'mismatches': mismatches,
+        'total_candidates': len(candidates),
+    })
+
+
+@app.route('/api/audit/payments/<int:payment_id>/status', methods=['POST'])
+@api_auth_required
+def api_audit_update_status(payment_id):
+    user = request.current_user
+    if user.role not in ['admin', 'regional_bishop']:
+        return jsonify({'error': 'Forbidden'}), 403
+    payment = Payment.query.get_or_404(payment_id)
+    if user.role == 'regional_bishop':
+        church = Church.query.get(payment.church_id)
+        if not church:
+            return jsonify({'error': 'Forbidden'}), 403
+        sub_region = SubRegion.query.get(church.sub_region_id)
+        if not sub_region or sub_region.region_id != user.region_id:
+            return jsonify({'error': 'Forbidden'}), 403
+    data = request.get_json(silent=True) or {}
+    status = data.get('audit_status')
+    notes = data.get('audit_notes', '')
+    if status not in ['pending', 'matched', 'mismatch', 'verified']:
+        return jsonify({'error': 'Invalid audit status'}), 400
+    payment.audit_status = status
+    payment.audit_notes = notes
+    db.session.commit()
+    return jsonify({'id': payment.id, 'audit_status': payment.audit_status, 'audit_notes': payment.audit_notes})
+
+
 @app.route('/')
 def index():
     if 'user_id' in session:
@@ -1492,6 +1715,104 @@ def admin_toggle_user(user_id):
     status = 'activated' if user.is_active else 'deactivated'
     flash('User "{}" has been {}.'.format(user.full_name, status), 'success')
     return redirect(request.referrer or url_for('admin_dashboard'))
+
+
+@app.route('/admin/audit')
+@login_required
+@role_required('admin')
+def admin_audit():
+    payments = Payment.query.order_by(Payment.created_at.desc()).all()
+    stats = {
+        'pending': sum(1 for p in payments if not p.audit_status or p.audit_status == 'pending'),
+        'matched': sum(1 for p in payments if p.audit_status == 'matched'),
+        'mismatch': sum(1 for p in payments if p.audit_status == 'mismatch'),
+        'verified': sum(1 for p in payments if p.audit_status == 'verified'),
+    }
+    return render_template('admin/audit.html', payments=payments, stats=stats, result=None)
+
+
+@app.route('/admin/audit/verify', methods=['POST'])
+@login_required
+@role_required('admin')
+def admin_audit_verify():
+    message = request.form.get('message', '').strip()
+    if not message:
+        flash('Please paste a bank message.', 'danger')
+        return redirect(url_for('admin_audit'))
+
+    parsed = parse_mpesa_message(message)
+    matches = []
+    mismatches = []
+    potential = []
+
+    query = Payment.query
+    if parsed['amount'] is not None:
+        query = query.filter(Payment.amount == parsed['amount'])
+    if parsed['paybill_number']:
+        query = query.filter(Payment.paybill_number == parsed['paybill_number'])
+    if parsed['payment_date']:
+        try:
+            msg_date = datetime.strptime(parsed['payment_date'], '%Y-%m-%d').date()
+            query = query.filter(Payment.payment_date == msg_date)
+        except ValueError:
+            pass
+
+    candidates = query.order_by(Payment.created_at.desc()).all()
+
+    for p in candidates:
+        record = {
+            'id': p.id,
+            'amount': p.amount,
+            'paybill_number': p.paybill_number,
+            'receipt_reference': p.receipt_reference,
+            'payment_date': p.payment_date.isoformat(),
+            'audit_status': p.audit_status,
+            'church_name': p.church.name if p.church else None,
+            'category_name': p.category.name if p.category else None,
+            'pastor_name': p.pastor.full_name if p.pastor else None,
+        }
+        if parsed['transaction_code'] and p.receipt_reference:
+            if parsed['transaction_code'].upper() == p.receipt_reference.upper():
+                matches.append(record)
+                continue
+        if parsed['amount'] is not None and parsed['paybill_number'] and parsed['payment_date']:
+            potential.append(record)
+        else:
+            mismatches.append(record)
+
+    result = {
+        'parsed': parsed,
+        'matches': matches,
+        'potential_matches': potential,
+        'mismatches': mismatches,
+        'total_candidates': len(candidates),
+    }
+
+    payments = Payment.query.order_by(Payment.created_at.desc()).all()
+    stats = {
+        'pending': sum(1 for p in payments if not p.audit_status or p.audit_status == 'pending'),
+        'matched': sum(1 for p in payments if p.audit_status == 'matched'),
+        'mismatch': sum(1 for p in payments if p.audit_status == 'mismatch'),
+        'verified': sum(1 for p in payments if p.audit_status == 'verified'),
+    }
+    return render_template('admin/audit.html', payments=payments, stats=stats, result=result)
+
+
+@app.route('/admin/audit/update_status/<int:payment_id>', methods=['POST'])
+@login_required
+@role_required('admin')
+def admin_audit_update_status(payment_id):
+    payment = Payment.query.get_or_404(payment_id)
+    status = request.form.get('audit_status')
+    notes = request.form.get('audit_notes', '')
+    if status in ['pending', 'matched', 'mismatch', 'verified']:
+        payment.audit_status = status
+        payment.audit_notes = notes
+        db.session.commit()
+        flash('Payment #{} marked as {}'.format(payment_id, status), 'success')
+    else:
+        flash('Invalid status.', 'danger')
+    return redirect(url_for('admin_audit'))
 
 
 @app.route('/admin/regions_report')
