@@ -476,6 +476,39 @@ def reset_password(token):
     return render_template('reset_password.html', token=token)
 
 
+@app.route('/change-password', methods=['GET', 'POST'])
+@login_required
+def change_password():
+    user = User.query.get(session['user_id'])
+    if request.method == 'POST':
+        current_password = request.form.get('current_password', '')
+        new_password = request.form.get('new_password', '')
+        confirm_password = request.form.get('confirm_password', '')
+
+        if not current_password or not new_password or not confirm_password:
+            flash('All fields are required.', 'danger')
+            return redirect(url_for('change_password'))
+
+        if not check_password_hash(user.password_hash, current_password):
+            flash('Current password is incorrect.', 'danger')
+            return redirect(url_for('change_password'))
+
+        if new_password != confirm_password:
+            flash('New passwords do not match.', 'danger')
+            return redirect(url_for('change_password'))
+
+        if len(new_password) < 6:
+            flash('New password must be at least 6 characters.', 'danger')
+            return redirect(url_for('change_password'))
+
+        user.password_hash = generate_password_hash(new_password)
+        db.session.commit()
+        flash('Password changed successfully.', 'success')
+        return redirect(url_for('dashboard'))
+
+    return render_template('change_password.html')
+
+
 @app.route('/dashboard')
 @login_required
 def dashboard():
@@ -1054,25 +1087,25 @@ def admin_regions_report():
         ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
     ]))
     
-    # Add color coding for percentage column (now column index 7)
+    # Add color coding for percentage column (now column index 7) - background colors with black text
     for i in range(1, len(data) - 1):  # Skip header and total row
         percentage_str = data[i][7]
         if percentage_str:
             percentage = float(percentage_str.replace('%', ''))
             if percentage < 50:
-                table.setStyle(TableStyle([('TEXTCOLOR', (7, i), (7, i), colors.red)]))
+                table.setStyle(TableStyle([('BACKGROUND', (7, i), (7, i), colors.red), ('TEXTCOLOR', (7, i), (7, i), colors.black)]))
             elif percentage < 100:
-                table.setStyle(TableStyle([('TEXTCOLOR', (7, i), (7, i), colors.yellow)]))
+                table.setStyle(TableStyle([('BACKGROUND', (7, i), (7, i), colors.yellow), ('TEXTCOLOR', (7, i), (7, i), colors.black)]))
             else:
-                table.setStyle(TableStyle([('TEXTCOLOR', (7, i), (7, i), colors.green)]))
+                table.setStyle(TableStyle([('BACKGROUND', (7, i), (7, i), colors.green), ('TEXTCOLOR', (7, i), (7, i), colors.black)]))
     
-    # Color the total row percentage
+    # Color the total row percentage with background color and black text
     if total_percentage < 50:
-        table.setStyle(TableStyle([('TEXTCOLOR', (7, -1), (7, -1), colors.red)]))
+        table.setStyle(TableStyle([('BACKGROUND', (7, -1), (7, -1), colors.red), ('TEXTCOLOR', (7, -1), (7, -1), colors.black)]))
     elif total_percentage < 100:
-        table.setStyle(TableStyle([('TEXTCOLOR', (7, -1), (7, -1), colors.yellow)]))
+        table.setStyle(TableStyle([('BACKGROUND', (7, -1), (7, -1), colors.yellow), ('TEXTCOLOR', (7, -1), (7, -1), colors.black)]))
     else:
-        table.setStyle(TableStyle([('TEXTCOLOR', (7, -1), (7, -1), colors.green)]))
+        table.setStyle(TableStyle([('BACKGROUND', (7, -1), (7, -1), colors.green), ('TEXTCOLOR', (7, -1), (7, -1), colors.black)]))
     
     # Build the PDF
     elements = []
@@ -1309,6 +1342,116 @@ def regional_manage_sub_bishops():
     user = User.query.get(session['user_id'])
     sub_bishops = User.query.filter_by(role='sub_region_bishop', region_id=user.region_id).all()
     return render_template('regional/manage_sub_bishops.html', sub_bishops=sub_bishops)
+
+
+@app.route('/regional/edit_sub_bishop/<int:sub_bishop_id>', methods=['GET', 'POST'])
+@login_required
+@role_required('regional_bishop')
+def regional_edit_sub_bishop(sub_bishop_id):
+    user = User.query.get(session['user_id'])
+    sub_bishop = User.query.get_or_404(sub_bishop_id)
+    
+    # Verify the sub-bishop belongs to this regional bishop's region
+    if sub_bishop.region_id != user.region_id:
+        flash('You do not have permission to edit this sub-bishop.', 'danger')
+        return redirect(url_for('regional_manage_sub_bishops'))
+    
+    if request.method == 'POST':
+        sub_bishop.full_name = request.form.get('full_name', '').strip()
+        sub_bishop.email = request.form.get('email', '').strip()
+        sub_bishop.phone = request.form.get('phone', '').strip()
+        sub_bishop.sub_region_id = request.form.get('sub_region_id', type=int)
+        db.session.commit()
+        flash('Sub-region bishop updated successfully.', 'success')
+        return redirect(url_for('regional_manage_sub_bishops'))
+    
+    sub_regions = SubRegion.query.filter_by(region_id=user.region_id).all()
+    return render_template('regional/edit_sub_bishop.html', sub_bishop=sub_bishop, sub_regions=sub_regions)
+
+
+@app.route('/regional/delete_sub_bishop/<int:sub_bishop_id>', methods=['POST'])
+@login_required
+@role_required('regional_bishop')
+def regional_delete_sub_bishop(sub_bishop_id):
+    user = User.query.get(session['user_id'])
+    sub_bishop = User.query.get_or_404(sub_bishop_id)
+    
+    # Verify the sub-bishop belongs to this regional bishop's region
+    if sub_bishop.region_id != user.region_id:
+        flash('You do not have permission to delete this sub-bishop.', 'danger')
+        return redirect(url_for('regional_manage_sub_bishops'))
+    
+    db.session.delete(sub_bishop)
+    db.session.commit()
+    flash('Sub-region bishop deleted successfully.', 'success')
+    return redirect(url_for('regional_manage_sub_bishops'))
+
+
+@app.route('/regional/toggle_sub_bishop/<int:sub_bishop_id>', methods=['POST'])
+@login_required
+@role_required('regional_bishop')
+def regional_toggle_sub_bishop(sub_bishop_id):
+    user = User.query.get(session['user_id'])
+    sub_bishop = User.query.get_or_404(sub_bishop_id)
+    
+    # Verify the sub-bishop belongs to this regional bishop's region
+    if sub_bishop.region_id != user.region_id:
+        flash('You do not have permission to deactivate this sub-bishop.', 'danger')
+        return redirect(url_for('regional_manage_sub_bishops'))
+    
+    sub_bishop.is_active = not sub_bishop.is_active
+    db.session.commit()
+    status = 'activated' if sub_bishop.is_active else 'deactivated'
+    flash('Sub-region bishop has been {}.'.format(status), 'success')
+    return redirect(url_for('regional_manage_sub_bishops'))
+
+
+@app.route('/regional/manage_subregions')
+@login_required
+@role_required('regional_bishop')
+def regional_manage_subregions():
+    user = User.query.get(session['user_id'])
+    subregions = SubRegion.query.filter_by(region_id=user.region_id).all()
+    return render_template('regional/manage_subregions.html', subregions=subregions)
+
+
+@app.route('/regional/edit_subregion/<int:subregion_id>', methods=['GET', 'POST'])
+@login_required
+@role_required('regional_bishop')
+def regional_edit_subregion(subregion_id):
+    user = User.query.get(session['user_id'])
+    subregion = SubRegion.query.get_or_404(subregion_id)
+    
+    # Verify the subregion belongs to this regional bishop's region
+    if subregion.region_id != user.region_id:
+        flash('You do not have permission to edit this subregion.', 'danger')
+        return redirect(url_for('regional_manage_subregions'))
+    
+    if request.method == 'POST':
+        subregion.name = request.form.get('name', '').strip()
+        db.session.commit()
+        flash('Subregion updated successfully.', 'success')
+        return redirect(url_for('regional_manage_subregions'))
+    
+    return render_template('regional/edit_subregion.html', subregion=subregion)
+
+
+@app.route('/regional/delete_subregion/<int:subregion_id>', methods=['POST'])
+@login_required
+@role_required('regional_bishop')
+def regional_delete_subregion(subregion_id):
+    user = User.query.get(session['user_id'])
+    subregion = SubRegion.query.get_or_404(subregion_id)
+    
+    # Verify the subregion belongs to this regional bishop's region
+    if subregion.region_id != user.region_id:
+        flash('You do not have permission to delete this subregion.', 'danger')
+        return redirect(url_for('regional_manage_subregions'))
+    
+    db.session.delete(subregion)
+    db.session.commit()
+    flash('Subregion deleted successfully.', 'success')
+    return redirect(url_for('regional_manage_subregions'))
 
 
 @app.route('/regional/manage_pastors')
