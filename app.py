@@ -943,109 +943,91 @@ def admin_toggle_user(user_id):
 @login_required
 @role_required('admin')
 def admin_regions_report():
-    # Generate PDF report
-    from io import BytesIO
-    
-    # Create a buffer for the PDF with landscape orientation
-    buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), topMargin=0.5*inch, bottomMargin=0.5*inch, leftMargin=0.5*inch, rightMargin=0.5*inch)
-    
-    # Get all regions with their data
+    category_id = request.args.get('category_id', type=int)
+    download = request.args.get('download')
+    category = PaymentCategory.query.get(category_id) if category_id else None
+
     regions = Region.query.all()
-    
-    # Collect all sub-region data first for sorting
     sub_region_data = []
-    
+
     for region in regions:
-        # Get regional bishop full name by role and region
         regional_bishop = User.query.filter_by(role='regional_bishop', region_id=region.id).first()
         regional_bishop_name = regional_bishop.full_name if regional_bishop else 'N/A'
-        
-        # Get all sub-regions for this region
         sub_regions = SubRegion.query.filter_by(region_id=region.id).all()
-        
+
         for sub_region in sub_regions:
-            # Get all sub-region bishops by role and sub_region (handle multiple bishops)
             sub_region_bishops = User.query.filter_by(role='sub_region_bishop', sub_region_id=sub_region.id).all()
-            
-            # If no bishops assigned, still create a row for the sub-region
-            if not sub_region_bishops:
-                sub_region_bishop_name = 'N/A'
-                
-                # Calculate allocation for this sub-region
+            sub_region_bishop_name = sub_region_bishops[0].full_name if sub_region_bishops else 'N/A'
+
+            if category_id:
                 sub_region_allocation = db.session.query(db.func.sum(Allocation.amount)).filter(
-                    Allocation.level == 'sub_region', Allocation.target_id == sub_region.id).scalar() or 0
-                
-                # Calculate contributed for this sub-region
+                    Allocation.level == 'sub_region', Allocation.target_id == sub_region.id,
+                    Allocation.category_id == category_id
+                ).scalar() or 0
                 sub_region_church_ids = [c.id for c in Church.query.filter_by(sub_region_id=sub_region.id).all()]
                 sub_region_contributed = 0
                 if sub_region_church_ids:
                     church_allocations = [a.id for a in Allocation.query.filter(
-                        Allocation.level == 'church', Allocation.target_id.in_(sub_region_church_ids)).all()]
+                        Allocation.level == 'church', Allocation.target_id.in_(sub_region_church_ids),
+                        Allocation.category_id == category_id
+                    ).all()]
                     if church_allocations:
                         sub_region_contributed = db.session.query(db.func.sum(Payment.amount)).filter(
-                            Payment.allocation_id.in_(church_allocations)).scalar() or 0
-                
-                # Calculate balance and percentage
-                balance = sub_region_allocation - sub_region_contributed
-                percentage = (sub_region_contributed / sub_region_allocation * 100) if sub_region_allocation > 0 else 0
-                
-                # Store data for sorting
-                sub_region_data.append({
-                    'regional_bishop': regional_bishop_name,
-                    'sub_region_name': sub_region.name,
-                    'sub_region_bishop': sub_region_bishop_name,
-                    'allocation': sub_region_allocation,
-                    'contributed': sub_region_contributed,
-                    'balance': balance,
-                    'percentage': percentage
-                })
+                            Payment.allocation_id.in_(church_allocations),
+                            Payment.category_id == category_id
+                        ).scalar() or 0
             else:
-                # Create a row for each bishop in this sub-region
-                for sub_region_bishop in sub_region_bishops:
-                    sub_region_bishop_name = sub_region_bishop.full_name
-                    
-                    # Calculate allocation for this sub-region
-                    sub_region_allocation = db.session.query(db.func.sum(Allocation.amount)).filter(
-                        Allocation.level == 'sub_region', Allocation.target_id == sub_region.id).scalar() or 0
-                    
-                    # Calculate contributed for this sub-region
-                    sub_region_church_ids = [c.id for c in Church.query.filter_by(sub_region_id=sub_region.id).all()]
-                    sub_region_contributed = 0
-                    if sub_region_church_ids:
-                        church_allocations = [a.id for a in Allocation.query.filter(
-                            Allocation.level == 'church', Allocation.target_id.in_(sub_region_church_ids)).all()]
-                        if church_allocations:
-                            sub_region_contributed = db.session.query(db.func.sum(Payment.amount)).filter(
-                                Payment.allocation_id.in_(church_allocations)).scalar() or 0
-                    
-                    # Calculate balance and percentage
-                    balance = sub_region_allocation - sub_region_contributed
-                    percentage = (sub_region_contributed / sub_region_allocation * 100) if sub_region_allocation > 0 else 0
-                    
-                    # Store data for sorting
-                    sub_region_data.append({
-                        'regional_bishop': regional_bishop_name,
-                        'sub_region_name': sub_region.name,
-                        'sub_region_bishop': sub_region_bishop_name,
-                        'allocation': sub_region_allocation,
-                        'contributed': sub_region_contributed,
-                        'balance': balance,
-                        'percentage': percentage
-                    })
-    
-    # Sort by percentage from highest to lowest
+                sub_region_allocation = db.session.query(db.func.sum(Allocation.amount)).filter(
+                    Allocation.level == 'sub_region', Allocation.target_id == sub_region.id
+                ).scalar() or 0
+                sub_region_church_ids = [c.id for c in Church.query.filter_by(sub_region_id=sub_region.id).all()]
+                sub_region_contributed = 0
+                if sub_region_church_ids:
+                    church_allocations = [a.id for a in Allocation.query.filter(
+                        Allocation.level == 'church', Allocation.target_id.in_(sub_region_church_ids)
+                    ).all()]
+                    if church_allocations:
+                        sub_region_contributed = db.session.query(db.func.sum(Payment.amount)).filter(
+                            Payment.allocation_id.in_(church_allocations)
+                        ).scalar() or 0
+
+            balance = sub_region_allocation - sub_region_contributed
+            percentage = (sub_region_contributed / sub_region_allocation * 100) if sub_region_allocation > 0 else 0
+
+            sub_region_data.append({
+                'regional_bishop': regional_bishop_name,
+                'sub_region_name': sub_region.name,
+                'sub_region_bishop': sub_region_bishop_name,
+                'allocation': sub_region_allocation,
+                'contributed': sub_region_contributed,
+                'balance': balance,
+                'percentage': percentage
+            })
+
     sub_region_data.sort(key=lambda x: x['percentage'], reverse=True)
-    
-    # Prepare data for the table
+
+    if download == '1':
+        return _generate_regions_pdf(sub_region_data, category)
+
+    categories = PaymentCategory.query.order_by(PaymentCategory.name).all()
+    return render_template('admin/regions_report.html',
+                           sub_region_data=sub_region_data,
+                           categories=categories,
+                           selected_category_id=category_id,
+                           category=category)
+
+
+def _generate_regions_pdf(sub_region_data, category):
+    from io import BytesIO
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), topMargin=0.5*inch, bottomMargin=0.5*inch, leftMargin=0.5*inch, rightMargin=0.5*inch)
+
     data = [['S.No', 'Regional Bishop', 'Sub Region', 'Sub Region Bishop', 'Allocation', 'Contributed', 'Balance', 'Percentage Achieved']]
-    
     total_allocation = 0
     total_contributed = 0
     serial_number = 1
-    
+
     for item in sub_region_data:
-        # Add row to data with serial number
         data.append([
             str(serial_number),
             item['regional_bishop'],
@@ -1056,30 +1038,21 @@ def admin_regions_report():
             f'{item["balance"]:,.2f}',
             f'{item["percentage"]:.1f}%'
         ])
-        
         serial_number += 1
         total_allocation += item['allocation']
         total_contributed += item['contributed']
-    
-    # Add total row
+
     total_balance = total_allocation - total_contributed
     total_percentage = (total_contributed / total_allocation * 100) if total_allocation > 0 else 0
-    
     data.append([
-        '',
-        'TOTAL',
-        '',
-        '',
+        '', 'TOTAL', '', '',
         f'{total_allocation:,.2f}',
         f'{total_contributed:,.2f}',
         f'{total_balance:,.2f}',
         f'{total_percentage:.1f}%'
     ])
-    
-    # Create table with optimized column widths for landscape
+
     table = Table(data, colWidths=[0.4*inch, 1.8*inch, 1.8*inch, 1.8*inch, 1.2*inch, 1.2*inch, 1.2*inch, 1.2*inch])
-    
-    # Style the table
     table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
@@ -1094,9 +1067,8 @@ def admin_regions_report():
         ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey),
         ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
     ]))
-    
-    # Add color coding for percentage column (now column index 7) - background colors with black text
-    for i in range(1, len(data) - 1):  # Skip header and total row
+
+    for i in range(1, len(data) - 1):
         percentage_str = data[i][7]
         if percentage_str:
             percentage = float(percentage_str.replace('%', ''))
@@ -1106,56 +1078,48 @@ def admin_regions_report():
                 table.setStyle(TableStyle([('BACKGROUND', (7, i), (7, i), colors.yellow), ('TEXTCOLOR', (7, i), (7, i), colors.black)]))
             else:
                 table.setStyle(TableStyle([('BACKGROUND', (7, i), (7, i), colors.green), ('TEXTCOLOR', (7, i), (7, i), colors.black)]))
-    
-    # Color the total row percentage with background color and black text
+
     if total_percentage < 50:
         table.setStyle(TableStyle([('BACKGROUND', (7, -1), (7, -1), colors.red), ('TEXTCOLOR', (7, -1), (7, -1), colors.black)]))
     elif total_percentage < 100:
         table.setStyle(TableStyle([('BACKGROUND', (7, -1), (7, -1), colors.yellow), ('TEXTCOLOR', (7, -1), (7, -1), colors.black)]))
     else:
         table.setStyle(TableStyle([('BACKGROUND', (7, -1), (7, -1), colors.green), ('TEXTCOLOR', (7, -1), (7, -1), colors.black)]))
-    
-    # Build the PDF
+
     elements = []
-    
-    # Add title
     title_style = ParagraphStyle(
         'CustomTitle',
         parent=getSampleStyleSheet()['Heading1'],
         fontSize=16,
         spaceAfter=20,
-        alignment=1  # Center
+        alignment=1
     )
-    elements.append(Paragraph("Regional Financial Report", title_style))
+    report_title = f"{category.name} Financial Report" if category else "Regional Financial Report"
+    elements.append(Paragraph(report_title, title_style))
     elements.append(Spacer(1, 0.2*inch))
-    
-    # Add date
+
     date_style = ParagraphStyle(
         'CustomDate',
         parent=getSampleStyleSheet()['Normal'],
         fontSize=10,
-        alignment=1  # Center
+        alignment=1
     )
     elements.append(Paragraph(f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M')}", date_style))
     elements.append(Spacer(1, 0.2*inch))
-    
     elements.append(table)
-    
+
     doc.build(elements)
-    
-    # Get the PDF from the buffer
     buffer.seek(0)
     pdf_data = buffer.getvalue()
     buffer.close()
-    
-    # Send the PDF for viewing in browser
-    response = send_file(
+
+    filename = f"{category.name.replace(' ', '_')}_Financial_Report.pdf" if category else "Regional_Financial_Report.pdf"
+    return send_file(
         BytesIO(pdf_data),
         mimetype='application/pdf',
-        as_attachment=False  # This will display in browser instead of forcing download
+        as_attachment=True,
+        download_name=filename
     )
-    
-    return response
 
 
 # ==================== REGIONAL BISHOP ROUTES ====================
