@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, ScrollView, Picker, Alert } from 'react-native';
-import { api, Payment } from '../../services/api';
-import { useAuth } from '../../context/AuthContext';
+import { View, Text, TextInput, Button, StyleSheet, ScrollView, Alert } from 'react-native';
+import { Picker } from '@react-native-picker/picker';
+import { api, Payment } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 export default function AuditScreen({ navigation }: any) {
   const { user, token } = useAuth();

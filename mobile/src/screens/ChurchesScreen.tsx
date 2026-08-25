@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, Button, StyleSheet, ScrollView } from 'react-native';
-import { api, Church } from '../../services/api';
-import { useAuth } from '../../context/AuthContext';
+import { api, Church } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 export default function ChurchesScreen({ navigation }: any) {
   const { token } = useAuth();

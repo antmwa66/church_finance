@@ -3,19 +3,20 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuth } from '../src/context/AuthContext';
+import { useAuth } from '../context/AuthContext';
 
-import LoginScreen from '../src/screens/LoginScreen';
-import DashboardScreen from '../src/screens/DashboardScreen';
-import PaymentsScreen from '../src/screens/PaymentsScreen';
-import CreatePaymentScreen from '../src/screens/CreatePaymentScreen';
-import ChurchesScreen from '../src/screens/ChurchesScreen';
-import CreateChurchScreen from '../src/screens/CreateChurchScreen';
-import PastorsScreen from '../src/screens/PastorsScreen';
-import CreatePastorScreen from '../src/screens/CreatePastorScreen';
-import ReportsScreen from '../src/screens/ReportsScreen';
-import ProfileScreen from '../src/screens/ProfileScreen';
-import AuditScreen from '../src/screens/AuditScreen';
+import LoginScreen from '../screens/LoginScreen';
+import DashboardScreen from '../screens/DashboardScreen';
+import PaymentsScreen from '../screens/PaymentsScreen';
+import CreatePaymentScreen from '../screens/CreatePaymentScreen';
+import ChurchesScreen from '../screens/ChurchesScreen';
+import CreateChurchScreen from '../screens/CreateChurchScreen';
+import PastorsScreen from '../screens/PastorsScreen';
+import CreatePastorScreen from '../screens/CreatePastorScreen';
+import ReportsScreen from '../screens/ReportsScreen';
+import ProfileScreen from '../screens/ProfileScreen';
+import AuditScreen from '../screens/AuditScreen';
+import NativeCppDemoScreen from '../screens/NativeCppDemoScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -33,6 +34,7 @@ function MainTabs() {
         else if (route.name === 'Pastors') icon = 'people';
         else if (route.name === 'Reports') icon = 'bar-chart';
         else if (route.name === 'Audit') icon = 'search';
+        else if (route.name === 'C++ Demo') icon = 'code-slash';
         else if (route.name === 'Profile') icon = 'person';
         return <Ionicons name={icon} size={size} color={color} />;
       },
@@ -47,6 +49,7 @@ function MainTabs() {
       {(role === 'admin' || role === 'regional_bishop') && (
         <Tab.Screen name="Audit" component={AuditScreen} />
       )}
+      <Tab.Screen name="C++ Demo" component={NativeCppDemoScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
   );

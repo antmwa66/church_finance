@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const DEV_API_URL = '10.88.51.20';
-const API_BASE_URL = __DEV__ ? `http://${DEV_API_URL}:5000` : '10.88.51.20';
+const DEV_API_URL = '10.37.210.21';
+const API_BASE_URL = __DEV__ ? `http://${DEV_API_URL}:5000` : '10.37.210.21';
 
 export interface Category {
   id: number;

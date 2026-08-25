@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, Button, StyleSheet, ScrollView } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
-import { api, ReportItem, Category } from '../../services/api';
-import { useAuth } from '../../context/AuthContext';
+import { api, ReportItem, Category } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 export default function ReportsScreen({ navigation }: any) {
   const { token } = useAuth();
