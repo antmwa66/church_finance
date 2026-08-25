@@ -3,8 +3,8 @@ import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { AuthProvider } from './src/context/AuthContext';
 import AppNavigator from './src/navigation/AppNavigator';
 
-if (typeof global.domRect === 'undefined') {
-  (global as any).domRect = class DOMRect {
+if (typeof global.DOMRect === 'undefined') {
+  class DOMRect {
     x = 0;
     y = 0;
     width = 0;
@@ -18,7 +18,8 @@ if (typeof global.domRect === 'undefined') {
       this.top = y; this.left = x; this.bottom = y + height; this.right = x + width;
     }
     toJSON() { return {}; }
-  };
+  }
+  (global as any).DOMRect = DOMRect;
 }
 
 export default function App() {
