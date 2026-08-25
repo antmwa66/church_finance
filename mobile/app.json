@@ -5,18 +5,22 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
-    "platforms": ["ios", "android", "web"],
-    "icon": "./assets/icon.png",
+    "platforms": [
+      "ios",
+      "android",
+      "web"
+    ],
     "android": {
-      "package": "com.churchfinance.app",
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#FFFFFF"
-      }
+      "package": "com.churchfinance.app"
     },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.churchfinance.app"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "c7fc5ccf-b840-4bfa-9c5e-d3eed8e39e30"
+      }
     }
   }
 }
