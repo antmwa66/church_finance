@@ -7,6 +7,7 @@
 <div class="page-header">
     <h1>Pastor Dashboard</h1>
     <p>{{ church.name if church else 'My Church' }}</p>
+    <a href="{{ url_for('download_app') }}" class="btn btn-secondary" style="margin-top: 10px;">📱 Download Mobile App</a>
 </div>
 <div class="info-card">
     <p><strong>Church:</strong> {{ church.name if church else 'Not assigned' }}</p>

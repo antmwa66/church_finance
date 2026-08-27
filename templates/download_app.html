@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Download App - Church Finance{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Download Church Finance App</h1>
+    <p>Get the mobile app for Android or iOS</p>
+</div>
+<div class="form-container">
+    <h2>Android</h2>
+    <p>Download the APK file for Android devices.</p>
+    <a href="{{ url_for('download_app') }}" class="btn btn-primary">Download APK</a>
+    <p style="margin-top: 10px;"><small>Note: APK will be available after building the app.</small></p>
+</div>
+<div class="form-container" style="margin-top: 20px;">
+    <h2>iOS</h2>
+    <p>iOS version coming soon. Please use the web version for now.</p>
+    <button class="btn btn-secondary" disabled>Download iOS App</button>
+</div>
+<a href="{{ url_for('dashboard') }}" class="btn btn-secondary">Back to Dashboard</a>
+{% endblock %}

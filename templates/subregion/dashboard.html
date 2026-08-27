@@ -7,6 +7,7 @@
 <div class="page-header">
     <h1>Sub-Region Dashboard</h1>
     <p>{{ sub_region.name if sub_region else 'My Sub-Region' }}</p>
+    <a href="{{ url_for('download_app') }}" class="btn btn-secondary" style="margin-top: 10px;">📱 Download Mobile App</a>
 </div>
 <div class="stats-grid">
     <div class="stat-card">

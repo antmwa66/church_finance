@@ -970,6 +970,15 @@ def api_change_password():
     return jsonify({'message': 'Password changed successfully'})
 
 
+@app.route('/download-app')
+@login_required
+def download_app():
+    apk_path = os.path.join(os.path.dirname(__file__), 'mobile', 'android', 'app', 'build', 'outputs', 'apk', 'release', 'app-release.apk')
+    if os.path.exists(apk_path):
+        return send_file(apk_path, as_attachment=True, download_name='church-finance.apk')
+    return render_template('download_app.html')
+
+
 @app.route('/api/admin/audit/payments')
 @api_auth_required
 def api_admin_audit_payments():

@@ -8,6 +8,7 @@
     <h1>Dashboard</h1>
     <p>Welcome back, {{ session.get('full_name') }}</p>
     <a href="{{ url_for('admin_regions_report') }}" class="btn btn-primary" style="margin-top: 10px;">📊 Generate Regional Report (PDF)</a>
+    <a href="{{ url_for('download_app') }}" class="btn btn-secondary" style="margin-top: 10px; margin-left: 10px;">📱 Download Mobile App</a>
 </div>
 <div class="stats-grid">
     <a href="{{ url_for('admin_manage_regions') }}" class="stat-card">
